@@ -2,8 +2,10 @@
 // status bar and toasts.
 
 import { useState, type ReactNode } from 'react';
-import { PRI_LABEL, PRIORITIES, type Pri } from '../data/model';
-import { useApp, type FilterField, type PageId } from '../state';
+import { PRI_LABEL, type Pri } from '../data/model';
+import { scopeServiceLines, scopeSites, useApp, type FilterField, type PageId } from '../state';
+import { AREAS, type Area } from '../metrics';
+import { DIM_LABEL, dimMembers } from './widgets';
 import { makePeriod, miOf, PERIOD_KIND_LABEL, priorName, quartersOf, years, type PeriodKind } from '../periods';
 import { Icon } from './icons';
 
@@ -13,11 +15,11 @@ export const PAGES: PageMeta[] = [
   { id: 'executive', group: 'Summary', label: 'Executive', title: 'Executive Summary', question: 'How did IT run this month, and what do leaders need to know or decide?', slides: 'MOR slide 3', filters: [] },
   { id: 'review', group: 'Summary', label: 'Qtr & Year', title: 'Quarter and Year Review', question: 'How did each quarter and month of the year perform against target, and how does the year compare with last year?', slides: 'Board / ELT view', filters: [] },
   { id: 'financial', group: 'Summary', label: 'Financial', title: 'Financial and Value Summary', question: 'What does IT cost, are we on budget, and what did service misses and downtime cost us?', slides: 'CFO view', filters: [] },
-  { id: 'scorecard', group: 'Summary', label: 'Scorecard', title: 'Service Scorecard vs Targets', question: 'Which service levels met target this month, and which are trending the wrong way?', slides: 'MOR slides 4-5', filters: ['sites'] },
-  { id: 'service-desk', group: 'Analytics', label: 'Service Desk', title: 'Service Desk: Demand, Speed and Experience', question: 'Is demand under control, and are users getting fast, good service?', slides: 'MOR slides 6-7', filters: ['sites', 'pri', 'cat'] },
+  { id: 'scorecard', group: 'Summary', label: 'Scorecard', title: 'Service Scorecard vs Targets', question: 'Which service levels met target this month, and which are trending the wrong way?', slides: 'MOR slides 4-5', filters: [] },
+  { id: 'service-desk', group: 'Analytics', label: 'Service Desk', title: 'Service Desk: Demand, Speed and Experience', question: 'Is demand under control, and are users getting fast, good service?', slides: 'MOR slides 6-7', filters: ['pri', 'cat'] },
   { id: 'clinical', group: 'Analytics', label: 'Clinical Apps', title: 'Clinical Applications: EHR and Clinical System Health', question: 'Were the EHR and clinical systems available when clinicians needed them?', slides: 'MOR slide 8', filters: [] },
-  { id: 'infrastructure', group: 'Analytics', label: 'Infrastructure', title: 'Infrastructure Health: Stability, Protection and Capacity', question: 'Is the infrastructure stable, protected and sized for what is coming?', slides: 'MOR slide 9', filters: ['sites'] },
-  { id: 'incidents', group: 'Analytics', label: 'Major Incidents', title: 'Major Incidents: P1 and P2 Events and Fixes', question: 'What broke, who was affected, and are the fixes on track?', slides: 'MOR slide 10 · A5', filters: ['sites'] },
+  { id: 'infrastructure', group: 'Analytics', label: 'Infrastructure', title: 'Infrastructure Health: Stability, Protection and Capacity', question: 'Is the infrastructure stable, protected and sized for what is coming?', slides: 'MOR slide 9', filters: [] },
+  { id: 'incidents', group: 'Analytics', label: 'Major Incidents', title: 'Major Incidents: P1 and P2 Events and Fixes', question: 'What broke, who was affected, and are the fixes on track?', slides: 'MOR slide 10 · A5', filters: [] },
   { id: 'security', group: 'Analytics', label: 'Security', title: 'Security and Compliance: Risk Posture', question: 'How exposed are we, and is protection coverage where it needs to be?', slides: 'MOR slide 11', filters: [] },
   { id: 'sites', group: 'Analytics', label: 'Sites', title: 'Site IT Tear Sheet', question: 'How is IT performing at each site compared with the rest of the system?', slides: 'MOR appendix tear sheet', filters: [] },
   { id: 'projects', group: 'Act', label: 'Projects & Actions', title: 'Projects, Actions and Decisions', question: 'Are projects on track, what are we doing next month, and what do we need decided?', slides: 'MOR slides 12-13', filters: [] },
@@ -27,7 +29,11 @@ export const PAGE_BY_ID = Object.fromEntries(PAGES.map((p) => [p.id, p])) as Rec
 
 export function Header() {
   const { ds, route } = useApp();
-  const scope = route.sites.length === 0 ? `All sites (${ds.sites.length})` : route.sites.length === 1 ? ds.sites[route.sites[0]].name : `${route.sites.length} sites`;
+  const sc = scopeSites(ds, route);
+  const scopeParts = [
+    ...route.region.map((k) => ds.regions[k]), ...route.ft.map((k) => ds.facilityTypes[k]),
+  ];
+  const scope = sc.length === 0 ? `All sites (${ds.sites.length})` : sc[0] === -1 ? 'No sites match' : sc.length === 1 ? ds.sites[sc[0]].name : `${scopeParts.length ? `${scopeParts.join(', ')}: ` : ''}${sc.length} sites`;
   const { period } = useApp();
   return (
     <header className="app-header">
@@ -77,16 +83,15 @@ export function NavTabs() {
   );
 }
 
-function Slicer({ field, open: defOpen = false }: { field: FilterField; open?: boolean }) {
+const SLICER_LABEL: Record<FilterField, string> = { ...DIM_LABEL, sites: 'Site', cat: 'Ticket category' };
+
+function Slicer({ field, open: defOpen = false, note }: { field: FilterField; open?: boolean; note?: string }) {
   const { ds, route, toggle, clear } = useApp();
   const [open, setOpen] = useState(defOpen);
-  const opts: { key: number | Pri; label: string }[] = field === 'sites'
-    ? ds.sites.map((s) => ({ key: s.key, label: s.name }))
-    : field === 'pri' ? PRIORITIES.map((p) => ({ key: p, label: PRI_LABEL[p] }))
-      : ds.categories.map((c) => ({ key: c.key, label: c.name }));
+  const opts = dimMembers(field, ds, route).map((o) => ({ ...o, label: field === 'sites' ? ds.sites[o.key as number].name : o.label }));
   const chosen = route[field] as (number | Pri)[];
-  const name = field === 'sites' ? 'Site' : field === 'pri' ? 'Priority' : 'Ticket category';
-  const summary = chosen.length === 0 ? 'All' : chosen.length === 1 ? opts.find((o) => o.key === chosen[0])?.label : `${chosen.length} selected`;
+  const name = SLICER_LABEL[field];
+  const summary = chosen.length === 0 ? 'All' : chosen.length === 1 ? (opts.find((o) => o.key === chosen[0])?.label ?? '1 selected') : `${chosen.length} selected`;
   return (
     <div className={`slicer ${chosen.length ? 'active' : ''}`}>
       <div className="slicer-head">
@@ -99,11 +104,48 @@ function Slicer({ field, open: defOpen = false }: { field: FilterField; open?: b
       </div>
       {open && (
         <div className="slicer-body">
-          <div className="slicer-list">
+          {note && <div className="slicer-note">{note}</div>}
+          <div className="slicer-actions">
+            <button type="button" className="link" onClick={() => clear(field)}>Clear</button>
+          </div>
+          <div className="slicer-list" role="listbox" aria-multiselectable="true" aria-label={name}>
             {opts.map((o) => (
               <label key={String(o.key)} className={`slicer-opt ${chosen.includes(o.key) ? 'on' : ''}`}>
                 <input type="checkbox" checked={chosen.includes(o.key)} onChange={() => toggle(field, o.key)} />
                 <span className="opt-label">{o.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** IT area: limits the KPIs listed in scorecards and definitions (the RCM "RCM area" slicer). */
+function AreaSlicer() {
+  const { route, set } = useApp();
+  const [open, setOpen] = useState(route.areas.length > 0);
+  const areas = route.areas;
+  const flip = (a: Area) => set({ areas: areas.includes(a) ? areas.filter((x) => x !== a) : [...areas, a] });
+  return (
+    <div className={`slicer ${areas.length ? 'active' : ''}`}>
+      <div className="slicer-head">
+        <button type="button" className="slicer-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          <Icon name={open ? 'chevronDown' : 'chevronRight'} size={10} />
+          <span className="slicer-name">IT area</span>
+          <span className="slicer-sum">{areas.length === 0 ? 'All' : areas.length === 1 ? areas[0] : `${areas.length} selected`}</span>
+        </button>
+        {areas.length > 0 && <button type="button" className="icon-btn xs" title="Clear IT area" onClick={() => set({ areas: [] })}><Icon name="close" size={10} /></button>}
+      </div>
+      {open && (
+        <div className="slicer-body">
+          <div className="slicer-note">Limits the KPIs listed in the scorecard, the quarter and year review and the definitions.</div>
+          <div className="slicer-list">
+            {AREAS.map((a) => (
+              <label key={a} className={`slicer-opt ${areas.includes(a) ? 'on' : ''}`}>
+                <input type="checkbox" checked={areas.includes(a)} onChange={() => flip(a)} />
+                <span className="opt-label">{a}</span>
               </label>
             ))}
           </div>
@@ -166,7 +208,7 @@ export function PeriodControls({ layout = 'stack' }: { layout?: 'stack' | 'row' 
 export function FilterPane() {
   const { route, clear, paneOpen, setPaneOpen } = useApp();
   const meta = PAGE_BY_ID[route.page];
-  const active = route.sites.length + route.pri.length + route.cat.length;
+  const active = route.region.length + route.ft.length + route.sites.length + route.pt.length + route.sl.length + route.pri.length + route.cat.length + route.areas.length;
   if (!paneOpen) {
     return (
       <aside className="pane pane-closed no-print" aria-label="Filters (collapsed)">
@@ -176,6 +218,7 @@ export function FilterPane() {
       </aside>
     );
   }
+  const enterprisePage = ['clinical', 'security', 'financial', 'projects', 'reference'].includes(meta.id);
   return (
     <aside className="pane no-print" aria-label="Filters">
       <div className="pane-head">
@@ -187,20 +230,35 @@ export function FilterPane() {
       </div>
       <div className="pane-scroll">
         <section className="pane-sec">
-          <h4>Reporting period</h4>
+          <h4>Date</h4>
           <PeriodControls />
         </section>
         <section className="pane-sec">
           <h4>Organization</h4>
-          <Slicer field="sites" open={meta.filters.includes('sites')} />
-          {!meta.filters.includes('sites') && meta.id !== 'executive' && <div className="fld-note">Most measures on this page are enterprise-wide; the site filter applies only where marked.</div>}
+          <Slicer field="region" />
+          <Slicer field="ft" />
+          <Slicer field="sites" open={route.page === 'service-desk' || route.sites.length > 0} />
+          {enterprisePage && <div className="fld-note">Most measures on this page are enterprise-wide; organization filters apply to site-level measures only.</div>}
+        </section>
+        <section className="pane-sec pane-na">
+          <h4>Payer</h4>
+          <div className="fld-note">Not used in IT operations: tickets, outages and IT costs are not billed by payor group or payer. Use Service below to see which clinical areas are affected.</div>
         </section>
         <section className="pane-sec">
-          <h4>Service desk</h4>
-          <Slicer field="pri" open={meta.filters.includes('pri') && route.pri.length > 0} />
-          <Slicer field="cat" open={meta.filters.includes('cat') && route.cat.length > 0} />
-          <div className="fld-note">Applies to ticket measures. Click bars on the Service Desk page to set these.</div>
+          <h4>Service</h4>
+          <Slicer field="pt" note="Care setting of the requesting department. Applies to ticket measures." />
+          <Slicer field="sl" note="Requesting department's service line. Applies to ticket measures." />
         </section>
+        <section className="pane-sec">
+          <h4>Metrics</h4>
+          <AreaSlicer />
+        </section>
+        {meta.filters.length > 0 && (
+          <section className="pane-sec pane-page">
+            <h4>This page</h4>
+            {meta.filters.map((f) => <Slicer key={f} field={f} open={(route[f] as unknown[]).length > 0} note="Applies to ticket measures." />)}
+          </section>
+        )}
         <section className="pane-sec pane-legend">
           <h4>Status rules (A4)</h4>
           <div className="legend-list">
@@ -239,23 +297,28 @@ export function CanvasHeader({ title, right, question }: { title?: string; right
 }
 
 export function AppliedFilters() {
-  const { ds, route, toggle, clear, period, cmpPeriod } = useApp();
-  const chips: { f: FilterField; k: number | Pri; label: string }[] = [
-    ...route.sites.map((k) => ({ f: 'sites' as const, k, label: ds.sites[k]?.short ?? String(k) })),
-    ...route.pri.map((k) => ({ f: 'pri' as const, k, label: PRI_LABEL[k] })),
-    ...route.cat.map((k) => ({ f: 'cat' as const, k, label: ds.categories[k]?.name ?? String(k) })),
-  ];
-  const FIELD = { sites: 'Site', pri: 'Priority', cat: 'Category' };
+  const { ds, route, toggle, clear, set, period, cmpPeriod } = useApp();
+  const label = (f: FilterField, k: number | Pri) => (f === 'pri' ? PRI_LABEL[k as Pri] : dimMembers(f, ds).find((m) => m.key === k)?.label ?? String(k));
+  const order: FilterField[] = ['region', 'ft', 'sites', 'pt', 'sl', 'pri', 'cat'];
+  const chips = order.flatMap((f) => (route[f] as (number | Pri)[]).map((k) => ({ f, k, label: label(f, k) })));
+  const none = scopeSites(ds, route)[0] === -1 || scopeServiceLines(ds, route)[0] === -1;
   return (
     <div className="applied" role="region" aria-label="Applied filters">
       <span className="applied-chip fixed"><span className="chip-field">Period</span> {period.label} <span className="muted">vs {priorName(period, route.compare)} ({cmpPeriod.label})</span></span>
       {chips.map((c) => (
         <span key={`${c.f}-${c.k}`} className="applied-chip">
-          <span className="chip-field">{FIELD[c.f]}</span>
+          <span className="chip-field">{SLICER_LABEL[c.f]}</span>
           <button type="button" className="chip-val" onClick={() => toggle(c.f, c.k)} aria-label={`Remove ${c.label}`}>{c.label} <Icon name="close" size={9} /></button>
         </span>
       ))}
-      {chips.length === 0 ? <span className="muted small">No filters applied. Click any bar or row to filter; use the pane on the left for more.</span>
+      {route.areas.length > 0 && (
+        <span className="applied-chip"><span className="chip-field">IT area</span>
+          <span className="chip-val static">{route.areas.join(', ')}</span>
+          <button type="button" className="chip-x" aria-label="Clear IT area" onClick={() => set({ areas: [] })}><Icon name="close" size={9} /></button>
+        </span>
+      )}
+      {none && <span className="txt-off small">No sites or service lines match these filters.</span>}
+      {chips.length === 0 && route.areas.length === 0 ? <span className="muted small">No filters applied. Click any bar or row to filter; use the pane on the left for more.</span>
         : <button type="button" className="link" onClick={() => clear()}>Clear all</button>}
     </div>
   );

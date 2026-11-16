@@ -17,15 +17,22 @@ export interface Month { mi: number; key: string; label: string; short: string; 
 
 export interface Site {
   key: number; code: string; name: string; short: string;
+  /** Region and facility type: same groupings as the RCM analytics product. */
+  region: number; facilityType: number;
   beds: number; users: number; devices: number; lead: string; ehr: string;
   weight: number;
 }
 
 export interface Category { key: number; name: string; rootCause: string; fix: string }
 
+/** Requesting department's service line, grouped by patient type (care setting), as in RCM analytics. */
+export interface ServiceLine { key: number; name: string; patientType: number }
+
 /** One row per month, site and priority (from the IT service management tool). */
 export interface TicketFact {
   mi: number; site: number; pri: Pri; cat: number;
+  /** Service line of the requesting department. */
+  svc: number;
   opened: number; resolved: number; slaMet: number;
   respMinSum: number; resolveHrsSum: number;
 }
@@ -114,6 +121,7 @@ export interface Commentary {
 export interface Dataset {
   client: string; provider: string; months: Month[]; currentMi: number;
   sites: Site[]; categories: Category[]; systems: ClinicalSystem[];
+  regions: string[]; facilityTypes: string[]; patientTypes: string[]; serviceLines: ServiceLine[];
   tickets: TicketFact[]; siteMonths: SiteMonth[]; systemMonths: SystemMonth[];
   infra: InfraMonth[]; security: SecMonth[]; incidents: Incident[]; finance: FinMonth[];
   /** Mock planning assumption: cost of one hour of clinical downtime across the system. */

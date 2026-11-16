@@ -63,7 +63,7 @@ export function Infrastructure() {
           <Chart height={220} ariaLabel="Downtime by type" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}
             option={stackedOption({ labels: months.map((m) => m.short), fmt: (v) => `${v.toFixed(1)} h`, series: [{ name: 'Scheduled', data: months.map((m) => ds.infra[m.mi].schedHrs), color: '#a9b0bb' }, { name: 'Unscheduled', data: months.map((m) => ds.infra[m.mi].unschedHrs), color: STATUS_COLOR.off }] })} />
         </Visual>
-        <BreakdownVisual id="network" alt={['patch30', 'crit7']} dim="sites" title="Network availability by site" statusColors showCompare={false} height={220} />
+        <BreakdownVisual id="network" alt={['patch30', 'crit7']} dim="sites" title="Network availability by site" subtitle="Click a bar to filter · use Region or Facility type in the pane to compare groups" statusColors showCompare={false} height={220} />
         <Visual title="Changes implemented by type" metricId="chg_total" subtitle="Standard / normal / emergency · failed changes caused an incident"
           table={{ columns: ['Month', 'Standard', 'Normal', 'Emergency', 'Failed'], rows: months.map((m) => { const i = ds.infra[m.mi]; return [m.label, i.chgStd, i.chgNormal, i.chgEmerg, i.chgFailed]; }) }}>
           <Chart height={220} ariaLabel="Changes by type" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}

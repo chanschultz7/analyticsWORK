@@ -27,7 +27,8 @@ export function Review() {
   const yearP = makePeriod(ds, 'year', ytdEnd);
   const monthMis = Array.from({ length: 12 }, (_, k) => miOf(ds, year, k));
   const pctx = (p: { mis: number[]; endMi: number; kind: Ctx['kind'] }): Ctx => ({ ...base, mi: p.endMi, mis: p.mis, kind: p.kind });
-  const ids = (headline ? HEADLINE : SCORECARD_IDS).filter((id) => area === 'All' || M(id).area === area);
+  const { route } = useApp();
+  const ids = (headline ? HEADLINE : SCORECARD_IDS).filter((id) => (area === 'All' || M(id).area === area) && (!route.areas.length || route.areas.includes(M(id).area)));
 
   const rows = useMemo(() => ids.map((id) => ({
     id, year: evaluate(ds, id, pctx(yearP), 1),

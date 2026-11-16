@@ -9,7 +9,7 @@ import { Grid, gridExport, type Col } from '../ui/Grid';
 import { CanvasHeader } from '../ui/Shell';
 import { Visual } from '../ui/Visual';
 
-const TABS = [['a1', 'A1 · Contract service levels'], ['a2', 'A2 · Metric definitions'], ['a3', 'A3 · Incident severity'], ['a4', 'A4 · Status rules']] as const;
+const TABS = [['a1', 'A1 · Contract service levels'], ['a2', 'A2 · Metric definitions'], ['a3', 'A3 · Incident severity'], ['a4', 'A4 · Status rules'], ['dims', 'Dimensions and filters']] as const;
 
 export function Reference() {
   const { route, set } = useApp();
@@ -24,6 +24,7 @@ export function Reference() {
       {tab === 'a2' && <Definitions />}
       {tab === 'a3' && <Severity />}
       {tab === 'a4' && <StatusRules />}
+      {tab === 'dims' && <Dimensions />}
     </div>
   );
 }
@@ -69,7 +70,8 @@ function notes(r: SlaRow) {
 
 function Definitions() {
   const { ds, ctx } = useApp();
-  const list = METRICS.filter((m) => m.area !== 'Executive' || true);
+  const { route } = useApp();
+  const list = METRICS.filter((m) => !route.areas.length || route.areas.includes(m.area));
   const cols: Col<MetricDef>[] = [
     { key: 'code', label: 'Code', value: (r) => r.code, width: 60 },
     { key: 'name', label: 'Metric', align: 'left', value: (r) => r.name, width: 220 },
@@ -151,6 +153,30 @@ function StatusRules() {
         </div>
         <p className="footnote">Availability measures use the change in downtime (the gap to 100%) so small moves still register.</p>
       </Visual>
+    </div>
+  );
+}
+
+/** Every dimension the dashboard filters and groups by, with its members (sidebar order). */
+function Dimensions() {
+  const { ds } = useApp();
+  const block = (title: string, note: string, items: [string, string][]) => (
+    <Visual title={title} subtitle={note}>
+      <ul className="dim-list">{items.map(([a, b]) => <li key={a}><span>{a}</span><span className="muted">{b}</span></li>)}</ul>
+    </Visual>
+  );
+  const ticketsBy = (f: (t: (typeof ds.tickets)[number]) => boolean) => ds.tickets.filter((t) => t.mi === ds.currentMi && f(t)).reduce((a, t) => a + t.opened, 0);
+  return (
+    <div className="dim-grid">
+      {block('Region', 'Organization · groups sites', ds.regions.map((r, i) => [r, ds.sites.filter((s) => s.region === i).map((s) => s.short).join(', ')]))}
+      {block('Facility type', 'Organization · groups sites', ds.facilityTypes.map((r, i) => [r, ds.sites.filter((s) => s.facilityType === i).map((s) => s.short).join(', ') || '–']))}
+      {block('Site', 'Organization · hospitals and clinics', ds.sites.map((s) => [s.name, `${ds.regions[s.region]} · ${ds.facilityTypes[s.facilityType]}${s.beds ? ` · ${s.beds} beds` : ''}`]))}
+      {block('Payer', 'Not used in IT operations', [['Payor group / payer', 'IT tickets, outages and costs are not billed by payer']])}
+      {block('Patient type', 'Service · care setting of the requesting department (ticket measures)', ds.patientTypes.map((p, i) => [p, ds.serviceLines.filter((s) => s.patientType === i).map((s) => s.name).join(', ')]))}
+      {block('Service line', `Service · requesting department (tickets opened, ${ds.months[ds.currentMi].label})`, ds.serviceLines.map((s) => [s.name, `${ds.patientTypes[s.patientType]} · ${ticketsBy((t) => t.svc === s.key).toLocaleString()} tickets`]))}
+      {block('IT area', 'Metrics · groups KPIs in scorecards and definitions', AREAS.map((a) => [a, `${METRICS.filter((m) => m.area === a).length} KPIs`]))}
+      {block('Priority', 'This page (Service Desk) · ticket priority', [['P1 Critical', 'Respond 15 min · restore 4 hrs'], ['P2 High', 'Respond 30 min · restore 8 hrs'], ['P3 Moderate', 'Respond 4 hrs · resolve 24 hrs'], ['P4 Low', 'Respond 8 hrs · resolve 72 hrs'], ['Service requests', 'Respond 8 hrs · fulfil 72 hrs']])}
+      {block('Ticket category', 'This page (Service Desk) · issue type', ds.categories.map((c) => [c.name, `${ticketsBy((t) => t.cat === c.key).toLocaleString()} tickets`]))}
     </div>
   );
 }

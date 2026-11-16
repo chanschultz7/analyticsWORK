@@ -52,7 +52,18 @@ with "GitHub Actions" as the source in the repository settings).
   prior period or the same period last year. Counts and hours add up over the period, rates are
   weighted, coverage and backlog are month-end values, capacity is the peak, and per-month targets
   (incidents, downtime hours) scale to the period length. Mock data runs January 2024 to October 2026.
-- **Filters** (left pane): site, priority and ticket category. Clicking a bar or table row toggles the matching filter; chips under the page title
+- **Sidebar** (same sections and order as the RCM analytics product):
+
+  | Section | RCM analytics | IT dashboard |
+  |---|---|---|
+  | Date | Period type, period, compare to | View (month, quarter, YTD, full year, rolling 12), year, month or quarter, compare to |
+  | Organization | Region, facility type, hospital | Region, facility type, site (same regions and facility types; sites follow region and type) |
+  | Payer | Payor group, payer | Not used: IT tickets, outages and costs are not billed by payer |
+  | Service | Patient type, service line | Patient type and service line of the requesting department (same groupings, plus Non-clinical / Administrative and revenue cycle); applies to ticket measures |
+  | Metrics | RCM area | IT area (limits KPIs in the scorecard, quarter and year review and definitions) |
+  | This page | Page filters (e.g. denial reason) | Service Desk: priority, ticket category |
+
+  Every bar and table row cross-filters the page; the SLAs & Definitions page lists every dimension and its members. Clicking a bar or table row toggles the matching filter; chips under the page title
   show what is applied. Everything is stored in the URL, so a copied link reopens the same view.
 - **Status rules** follow MOR appendix A4: green meets target; amber is inside the amber band, or meets
   target with an unfavorable 3-month trend while close to target; red is outside the amber band or

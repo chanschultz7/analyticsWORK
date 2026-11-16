@@ -25,7 +25,13 @@ export const TREND_THRESHOLD = 0.05;
  * Row-based measures sum their numerators and denominators over mis; others combine monthly
  * values by the metric's `agg` rule.
  */
-export interface Ctx { mi: number; mis: number[]; kind: PeriodKind; sites: number[]; pri: Pri[]; cat: number[] }
+export interface Ctx {
+  mi: number; mis: number[]; kind: PeriodKind;
+  /** Sites in scope (after region, facility type and site filters); [] = all. */
+  sites: number[]; pri: Pri[]; cat: number[];
+  /** Requesting service lines in scope (after patient type and service line filters); [] = all. Ticket measures only. */
+  svc: number[];
+}
 
 /** A one-month context at month mi (used for trends and month-only rules). */
 export const monthCtx = (c: Ctx, mi: number): Ctx => ({ ...c, mi, mis: [mi], kind: 'month' });
@@ -79,7 +85,7 @@ function I(ds: Dataset) {
 const validMis = (ds: Dataset, mis: number[]) => mis.filter((mi) => mi >= 0 && mi < ds.months.length);
 export function ticketRows(ds: Dataset, c: Ctx, over: Partial<Ctx> = {}) {
   const cc = { ...c, ...over };
-  return validMis(ds, cc.mis).flatMap((mi) => I(ds).t[mi]).filter((r) => (!cc.sites.length || cc.sites.includes(r.site)) && (!cc.pri.length || cc.pri.includes(r.pri)) && (!cc.cat.length || cc.cat.includes(r.cat)));
+  return validMis(ds, cc.mis).flatMap((mi) => I(ds).t[mi]).filter((r) => (!cc.sites.length || cc.sites.includes(r.site)) && (!cc.pri.length || cc.pri.includes(r.pri)) && (!cc.cat.length || cc.cat.includes(r.cat)) && (!cc.svc.length || cc.svc.includes(r.svc)));
 }
 export function siteRows(ds: Dataset, c: Ctx) {
   return validMis(ds, c.mis).flatMap((mi) => I(ds).sm[mi]).filter((r) => !c.sites.length || c.sites.includes(r.site));
@@ -156,7 +162,7 @@ export const METRICS: MetricDef[] = [
     id: 'svc_levels_met', code: 'EX-02', name: 'Service levels met', area: 'Executive', unit: 'pct', digits: 0, target: 1, better: 'up', amber: 0.1,
     definition: 'Contract service levels (A1) met in the month ÷ contract service levels measured.', source: 'Calculated from A1', owner: 'Service Delivery Lead', scope: 'enterprise', page: 'reference',
     compute: (ds, c) => {
-      const st = CONTRACT_SLAS.map((s) => rawStatus(ds, M(s.id), { ...c, sites: [], pri: [], cat: [] }));
+      const st = CONTRACT_SLAS.map((s) => rawStatus(ds, M(s.id), { ...c, sites: [], pri: [], cat: [], svc: [] }));
       const measured = st.filter((s) => s !== 'none');
       return ratio(measured.filter((s) => s === 'ok').length, measured.length);
     },
@@ -169,7 +175,7 @@ export const METRICS: MetricDef[] = [
   {
     id: 'credits', code: 'EX-06', name: 'Service credits applied', short: 'Service credits', area: 'Executive', unit: 'usd', target: null, better: 'none', agg: 'sum',
     definition: 'Contract service credits owed to the client for missed service levels (A1), by month of the miss.', source: 'Calculated from A1; credit memos', owner: 'Client Service Executive', scope: 'enterprise', page: 'reference',
-    compute: (ds, c) => sum(CONTRACT_SLAS, (s) => (rawStatus(ds, M(s.id), { ...c, sites: [], pri: [], cat: [] }) === 'off' ? s.creditUsd : 0)),
+    compute: (ds, c) => sum(CONTRACT_SLAS, (s) => (rawStatus(ds, M(s.id), { ...c, sites: [], pri: [], cat: [], svc: [] }) === 'off' ? s.creditUsd : 0)),
   },
   // ---------------- Financial (CFO view; mock figures)
   {
@@ -187,7 +193,7 @@ export const METRICS: MetricDef[] = [
   {
     id: 'cost_ticket', code: 'FN-03', name: 'Cost per ticket resolved', short: 'Cost per ticket', area: 'Financial', unit: 'usd', target: 60, better: 'down', amber: 5, targetText: '≤ $60',
     definition: 'Service desk share of the managed services fee ÷ tickets resolved.', source: 'Invoices; ITSM', owner: 'Chief Financial Officer', scope: 'enterprise', page: 'financial',
-    compute: (ds, c) => ratio(sum(finRows(ds, c), (f) => feeOf(f) * f.serviceDeskShare), sum(ticketRows(ds, { ...c, sites: [], pri: [], cat: [] }), (x) => x.resolved)),
+    compute: (ds, c) => ratio(sum(finRows(ds, c), (f) => feeOf(f) * f.serviceDeskShare), sum(ticketRows(ds, { ...c, sites: [], pri: [], cat: [], svc: [] }), (x) => x.resolved)),
   },
   {
     id: 'cost_user', code: 'FN-04', name: 'IT cost per user per month', short: 'Cost per user / month', area: 'Financial', unit: 'usd', target: 55, better: 'down', amber: 3, targetText: '≤ $55',
@@ -269,7 +275,7 @@ export const METRICS: MetricDef[] = [
   {
     id: 'reopen', code: 'SD-22', name: 'Reopened ticket rate', short: 'Reopened', area: 'Service Desk', unit: 'pct', target: 0.05, better: 'down', amber: 0.01,
     definition: 'Resolved tickets reopened within 10 days ÷ resolved tickets.', source: ITSM, owner: 'Service Desk Manager', scope: 'site', page: 'service-desk',
-    compute: (ds, c) => ratio(sum(siteRows(ds, c), (x) => x.reopened), sum(ticketRows(ds, { ...c, pri: [], cat: [] }), (x) => x.resolved)),
+    compute: (ds, c) => ratio(sum(siteRows(ds, c), (x) => x.reopened), sum(ticketRows(ds, { ...c, pri: [], cat: [], svc: [] }), (x) => x.resolved)),
   },
   {
     id: 'csat', code: 'SD-23', name: 'User satisfaction (1 to 5)', short: 'User satisfaction', area: 'Service Desk', unit: 'score', digits: 2, target: 4.5, better: 'up', amber: 0.2,
@@ -562,7 +568,7 @@ const cache = new WeakMap<Dataset, Map<string, MetricValue>>();
 export function evaluate(ds: Dataset, id: string, c: Ctx, trendMonths = 13): MetricValue {
   let mc = cache.get(ds);
   if (!mc) { mc = new Map(); cache.set(ds, mc); }
-  const key = `${id}|${c.kind}|${c.mis.join(',')}|${c.sites.join(',')}|${c.pri.join(',')}|${c.cat.join(',')}|${trendMonths}`;
+  const key = `${id}|${c.kind}|${c.mis.join(',')}|${c.sites.join(',')}|${c.pri.join(',')}|${c.cat.join(',')}|${c.svc.join(',')}|${trendMonths}`;
   const hit = mc.get(key);
   if (hit) return hit;
   const m = M(id);

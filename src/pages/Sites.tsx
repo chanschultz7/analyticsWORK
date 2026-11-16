@@ -41,6 +41,7 @@ export function Sites() {
         </label>
       )} />
       <div className="site-facts">
+        <span>{ds.regions[site.region]} · {ds.facilityTypes[site.facilityType]}</span>
         <span>{site.beds ? `${site.beds} beds` : 'Outpatient'}</span><span>{num(site.users)} users</span><span>{num(site.devices)} devices</span>
         <span>Share of tickets {pct(share, 0)}</span><span>{site.ehr}</span><span>Convene site lead: {site.lead}</span>
       </div>
@@ -88,14 +89,16 @@ export function Sites() {
   );
 }
 
-interface CmpRow { key: number; name: string; vals: Record<string, ReturnType<typeof evaluate>> }
+interface CmpRow { key: number; name: string; region: string; type: string; vals: Record<string, ReturnType<typeof evaluate>> }
 const CMP = ['tickets_opened', 'sla_all', 'over7', 'fcr', 'csat', 'network', 'patch30', 'crit7', 'mi_p1p2'];
 
 function SiteComparison({ onPick, current }: { onPick: (k: number) => void; current: number }) {
   const { ds, ctx, period } = useApp();
-  const rows: CmpRow[] = ds.sites.map((s) => ({ key: s.key, name: s.name, vals: Object.fromEntries(CMP.map((id) => [id, evaluate(ds, id, { ...ctx, sites: [s.key], pri: [], cat: [] }, 1)])) }));
+  const rows: CmpRow[] = ds.sites.map((s) => ({ key: s.key, name: s.name, region: ds.regions[s.region], type: ds.facilityTypes[s.facilityType], vals: Object.fromEntries(CMP.map((id) => [id, evaluate(ds, id, { ...ctx, sites: [s.key], pri: [], cat: [] }, 1)])) }));
   const cols: Col<CmpRow>[] = [
     { key: 'name', label: 'Site', width: 220, value: (r) => r.name },
+    { key: 'region', label: 'Region', align: 'left', value: (r) => r.region },
+    { key: 'type', label: 'Facility type', align: 'left', value: (r) => r.type },
     ...CMP.map((id) => ({
       key: id, label: M(id).short ?? M(id).name,
       value: (r: CmpRow) => r.vals[id].value, render: (r: CmpRow) => fm(id)(r.vals[id].value), status: (r: CmpRow) => r.vals[id].status, exportText: (r: CmpRow) => fm(id)(r.vals[id].value),

@@ -2,19 +2,29 @@ import { useMemo, useState } from 'react';
 import { PRI_LABEL, PRIORITIES, type Pri } from '../data/model';
 import { fmt } from '../format';
 import { evaluate, M, monthCtx, periodValue, type Ctx } from '../metrics';
-import { useApp, type FilterField } from '../state';
+import { makeCtx, useApp, type FilterField, type RouteFilters } from '../state';
 import { Chart } from './Chart';
 import { barOption, COMPARE, lineOption, PRI_COLORS, SERIES, STATUS_COLOR } from './charts';
 import { fm } from './common';
 import { Icon } from './icons';
 import { Visual } from './Visual';
 
-export const DIM_LABEL: Record<FilterField, string> = { sites: 'Site', pri: 'Priority', cat: 'Category' };
+export const DIM_LABEL: Record<FilterField, string> = { region: 'Region', ft: 'Facility type', sites: 'Site', pt: 'Patient type', sl: 'Service line', pri: 'Priority', cat: 'Category' };
 
-export function dimMembers(dim: FilterField, ds: ReturnType<typeof useApp>['ds']): { key: number | Pri; label: string }[] {
-  if (dim === 'sites') return ds.sites.map((s) => ({ key: s.key, label: s.short }));
+/** Members of a dimension. Child dimensions follow their parent filter (site follows region and facility type; service line follows patient type), as in RCM analytics. */
+export function dimMembers(dim: FilterField, ds: ReturnType<typeof useApp>['ds'], r?: RouteFilters): { key: number | Pri; label: string }[] {
+  if (dim === 'region') return ds.regions.map((n, i) => ({ key: i, label: n }));
+  if (dim === 'ft') return ds.facilityTypes.map((n, i) => ({ key: i, label: n }));
+  if (dim === 'sites') return ds.sites.filter((s) => !r || ((!r.region.length || r.region.includes(s.region)) && (!r.ft.length || r.ft.includes(s.facilityType)))).map((s) => ({ key: s.key, label: s.short }));
+  if (dim === 'pt') return ds.patientTypes.map((n, i) => ({ key: i, label: n }));
+  if (dim === 'sl') return ds.serviceLines.filter((s) => !r || !r.pt.length || r.pt.includes(s.patientType)).map((s) => ({ key: s.key, label: s.name }));
   if (dim === 'pri') return PRIORITIES.map((p) => ({ key: p, label: PRI_LABEL[p] }));
   return ds.categories.map((c) => ({ key: c.key, label: c.name }));
+}
+
+/** Context for one member of a dimension: the dimension's own filter is replaced, others stay. */
+export function memberCtx(ds: ReturnType<typeof useApp>['ds'], ctx: Ctx, r: RouteFilters, dim: FilterField, key: number | Pri): Ctx {
+  return makeCtx(ds, ctx, { ...r, [dim]: [key] } as RouteFilters);
 }
 
 // ---------------------------------------------------------------- Trend
@@ -57,11 +67,11 @@ export function BreakdownVisual({ id, dim, title, subtitle, height, top, showCom
   const mid = alt?.length && [id, ...alt].includes(cur) ? cur : id;
   const m = M(mid);
   const f = fm(mid);
-  const rows = useMemo(() => dimMembers(dim, ds).map((mem) => {
-    const c = { ...ctx, [dim]: [mem.key] } as Ctx;
+  const rows = useMemo(() => dimMembers(dim, ds, route).map((mem) => {
+    const c = memberCtx(ds, ctx, route, dim, mem.key);
     const v = evaluate(ds, mid, c, 1);
     return { ...mem, value: v.value, prior: route.compare === 'py' ? v.py : v.prior, status: v.status, target: v.target };
-  }).filter((r) => r.value !== null), [ds, ctx, dim, mid, route.compare]);
+  }).filter((r) => r.value !== null), [ds, ctx, dim, mid, route]);
   let list = m.unit === 'count' || m.better !== 'down' ? [...rows].sort((a, b) => (b.value ?? 0) - (a.value ?? 0)) : [...rows].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
   if (dim === 'pri') list = rows;
   const more = top && list.length > top ? list.length - top : 0;
@@ -100,16 +110,17 @@ export function BreakdownVisual({ id, dim, title, subtitle, height, top, showCom
 // ---------------------------------------------------------------- Decomposition tree
 
 export function DecompositionTree({ id, dims, title }: { id: string; dims: FilterField[]; title: string }) {
-  const { ds, ctx, set, toast, period } = useApp();
+  const { ds, ctx, set, toast, period, route } = useApp();
   const [order, setOrder] = useState<FilterField[]>(dims.slice(0, 2));
   const [path, setPath] = useState<(number | Pri)[]>([]);
   const f = fm(id);
   const total = evaluate(ds, id, ctx, 1).value;
   const levels = order.slice(0, path.length + 1).map((dim, li) => {
-    const c: Ctx = { ...ctx };
-    for (let k = 0; k < li; k++) (c as unknown as Record<string, unknown>)[order[k]] = [path[k]];
-    const rows = dimMembers(dim, ds).map((mem) => ({ ...mem, value: periodValue(ds, M(id), { ...c, [dim]: [mem.key] } as Ctx) ?? 0 }))
-      .filter((r) => r.value > 0 && (!(ctx[dim] as unknown[]).length || (ctx[dim] as unknown[]).includes(r.key))).sort((a, b) => b.value - a.value);
+    const r: RouteFilters = { ...route };
+    for (let k = 0; k < li; k++) (r as unknown as Record<string, unknown>)[order[k]] = [path[k]];
+    const chosen = route[dim] as (number | Pri)[];
+    const rows = dimMembers(dim, ds, r).map((mem) => ({ ...mem, value: periodValue(ds, M(id), memberCtx(ds, ctx, r, dim, mem.key)) ?? 0 }))
+      .filter((x) => x.value > 0 && (!chosen.length || chosen.includes(x.key))).sort((a, b) => b.value - a.value);
     return { dim, rows };
   });
   const used = new Set(order.slice(0, path.length + 1));

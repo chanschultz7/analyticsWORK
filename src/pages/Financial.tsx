@@ -132,6 +132,8 @@ export function Financial() {
         <Grid caption="IT cost summary" columns={lcols} rows={lg} total={net} dense />
       </Visual>
 
+      <CostByServiceLine />
+
       <SectionHead title="Value and cost of service misses" note="Service credits recovered under the contract and the estimated cost of downtime" />
       <div className="row cols-2">
         <Visual title="Service credits by service level" metricId="credits" subtitle={`${period.label} · credit per month missed (A1)`} table={gridExport(crCols, creditRows.map((r) => ({ id: r.label, data: r })))}>
@@ -155,5 +157,31 @@ export function Financial() {
       </Commentary>
       <p className="footnote">Mock financials for demonstration. Run budget and fee structure are illustrative; replace with the client's contract and budget.</p>
     </div>
+  );
+}
+
+/** Managed IT spend allocated to service lines by their share of tickets (a simple chargeback view). */
+function CostByServiceLine() {
+  const { ds, ctx, period } = useApp();
+  const ec: Ctx = { ...ctx, pri: [], cat: [], svc: [] };
+  const spend = sum(finRows(ds, ec), feeOf);
+  const all = sum(ds.tickets.filter((t) => ec.mis.includes(t.mi) && (!ec.sites.length || ec.sites.includes(t.site))), (t) => t.opened);
+  type R = { key: number; name: string; pt: string; tickets: number; share: number; cost: number };
+  const rows: R[] = ds.serviceLines.map((s) => {
+    const n = sum(ds.tickets.filter((t) => t.svc === s.key && ec.mis.includes(t.mi) && (!ec.sites.length || ec.sites.includes(t.site))), (t) => t.opened);
+    return { key: s.key, name: s.name, pt: ds.patientTypes[s.patientType], tickets: n, share: all ? n / all : 0, cost: all ? (spend * n) / all : 0 };
+  });
+  const cols: Col<R>[] = [
+    { key: 'name', label: 'Service line', width: 200, value: (r) => r.name },
+    { key: 'pt', label: 'Patient type', align: 'left', value: (r) => r.pt },
+    { key: 'tickets', label: 'Tickets', value: (r) => r.tickets, render: (r) => r.tickets.toLocaleString() },
+    { key: 'share', label: 'Share', value: (r) => r.share, render: (r) => pct(r.share, 0) },
+    { key: 'cost', label: 'Allocated IT cost', value: (r) => r.cost, render: (r) => usd(r.cost), bar: true },
+  ];
+  const g = rows.map((r) => ({ id: String(r.key), data: r }));
+  return (
+    <Visual title="Managed IT cost by service line" subtitle={`${period.label} · managed services spend allocated by each service line's share of tickets (illustrative chargeback)`} table={gridExport(cols, g)}>
+      <Grid caption="IT cost by service line" columns={cols} rows={g} dense defaultSort={{ key: 'cost', dir: 'desc' }} />
+    </Visual>
   );
 }

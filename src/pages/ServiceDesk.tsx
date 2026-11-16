@@ -5,7 +5,7 @@ import { PRI_LABEL, PRIORITIES, type Pri } from '../data/model';
 import { RESOLVE_TARGET_HRS, RESP_TARGET_MIN, SLA_TARGET } from '../data/generate';
 import { fmt, fmtDelta, num, pct } from '../format';
 import { evaluate, priorShift, shiftCtx, ticketRows, type Ctx } from '../metrics';
-import { useApp } from '../state';
+import { scopeSites, useApp } from '../state';
 import { Chart } from '../ui/Chart';
 import { lineOption, PRI_COLORS, SERIES, stackedOption } from '../ui/charts';
 import { Commentary, KpiStrip, SectionHead } from '../ui/common';
@@ -39,6 +39,11 @@ export function ServiceDesk() {
         <BreakdownVisual id="tickets_opened" dim="cat" title="Tickets by category" top={10} showCompare />
         <BreakdownVisual id="tickets_opened" alt={['sla_all']} dim="pri" title="Tickets by priority" height={230} />
       </div>
+      <div className="row cols-3">
+        <BreakdownVisual id="tickets_opened" alt={['sla_all']} dim="sl" title="Tickets by service line" subtitle="Requesting department's service line · click a bar to filter" />
+        <BreakdownVisual id="tickets_opened" alt={['sla_all']} dim="pt" title="Tickets by patient type" subtitle="Care setting of the requesting department · click a bar to filter" height={200} />
+        <BreakdownVisual id="tickets_opened" alt={['sla_all', 'over7', 'csat', 'fcr']} dim="region" title="Tickets by region" height={200} />
+      </div>
       <SiteTable />
       <Commentary>{ds.commentary.serviceDesk}</Commentary>
 
@@ -49,7 +54,7 @@ export function ServiceDesk() {
         <SlaTrend />
       </div>
       <RecurringCategories />
-      <DecompositionTree id="tickets_opened" dims={['sites', 'cat', 'pri']} title="Ticket decomposition" />
+      <DecompositionTree id="tickets_opened" dims={['region', 'sites', 'pt', 'sl', 'cat', 'pri']} title="Ticket decomposition" />
     </div>
   );
 }
@@ -94,8 +99,10 @@ interface SiteRow { key: number; name: string; p: number[]; opened: number; clos
 
 function SiteTable() {
   const { ds, ctx, route, toggle, period } = useApp();
-  const all = sum(ticketRows(ds, { ...ctx, sites: [] }), (r) => r.opened);
-  const rows: SiteRow[] = ds.sites.map((s) => {
+  const all = sum(ticketRows(ds, { ...ctx, sites: scopeSites(ds, { ...route, sites: [] }) }), (r) => r.opened);
+  // Sites follow the region and facility type filters (as hospitals do in RCM analytics).
+  const inScope = (k: number) => (!route.region.length || route.region.includes(ds.sites[k].region)) && (!route.ft.length || route.ft.includes(ds.sites[k].facilityType));
+  const rows: SiteRow[] = ds.sites.filter((s) => inScope(s.key)).map((s) => {
     const c: Ctx = { ...ctx, sites: [s.key] };
     const t = ticketRows(ds, c);
     const opened = sum(t, (x) => x.opened);

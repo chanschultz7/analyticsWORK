@@ -1,16 +1,24 @@
 // Global app state: page, reporting month, comparison and cross-filters. Everything lives in the URL
 // hash (#/page?m=17&site=0,1&pri=P2&cat=3) so a link reopens the same view.
+//
+// Filters mirror the RCM analytics sidebar: Organization (region, facility type, site), Service
+// (patient type, service line), Metrics (IT area) and page filters (priority, ticket category).
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Dataset, Pri } from './data/model';
-import type { Ctx } from './metrics';
+import type { Area, Ctx } from './metrics';
 import { comparePeriod, makePeriod, type Period, type PeriodKind } from './periods';
 
 export type PageId = 'executive' | 'review' | 'financial' | 'scorecard' | 'service-desk' | 'clinical' | 'infrastructure' | 'incidents' | 'security' | 'sites' | 'projects' | 'reference';
 export type Compare = 'prior' | 'py';
-export type FilterField = 'sites' | 'pri' | 'cat';
+export type FilterField = 'region' | 'ft' | 'sites' | 'pt' | 'sl' | 'pri' | 'cat';
+export const FILTER_FIELDS: FilterField[] = ['region', 'ft', 'sites', 'pt', 'sl', 'pri', 'cat'];
 
-interface Route { page: PageId; mi: number; pk: PeriodKind; compare: Compare; sites: number[]; pri: Pri[]; cat: number[]; tab?: string; site?: number }
+interface Route {
+  page: PageId; mi: number; pk: PeriodKind; compare: Compare;
+  region: number[]; ft: number[]; sites: number[]; pt: number[]; sl: number[]; pri: Pri[]; cat: number[];
+  areas: Area[]; tab?: string; site?: number;
+}
 
 const PAGES: PageId[] = ['executive', 'review', 'financial', 'scorecard', 'service-desk', 'clinical', 'infrastructure', 'incidents', 'security', 'sites', 'projects', 'reference'];
 
@@ -24,7 +32,9 @@ function parse(hash: string, ds: Dataset): Route {
     mi: Number.isInteger(mi) && p.has('m') && mi >= 0 && mi <= ds.currentMi ? mi : ds.currentMi,
     pk: (['month', 'quarter', 'ytd', 'year', 'r12'] as const).find((k) => k === p.get('pk')) ?? 'month',
     compare: p.get('cmp') === 'py' ? 'py' : 'prior',
+    region: list('region').map(Number), ft: list('ft').map(Number),
     sites: list('site').map(Number).filter((n) => n >= 0 && n < ds.sites.length),
+    pt: list('pt').map(Number), sl: list('sl').map(Number), areas: list('area').map(decodeURIComponent) as Area[],
     pri: list('pri') as Pri[],
     cat: list('cat').map(Number),
     tab: p.get('tab') ?? undefined,
@@ -37,7 +47,12 @@ function build(r: Route, ds: Dataset): string {
   if (r.mi !== ds.currentMi) p.set('m', String(r.mi));
   if (r.pk !== 'month') p.set('pk', r.pk);
   if (r.compare === 'py') p.set('cmp', 'py');
+  if (r.region.length) p.set('region', r.region.join(','));
+  if (r.ft.length) p.set('ft', r.ft.join(','));
   if (r.sites.length) p.set('site', r.sites.join(','));
+  if (r.pt.length) p.set('pt', r.pt.join(','));
+  if (r.sl.length) p.set('sl', r.sl.join(','));
+  if (r.areas.length) p.set('area', r.areas.join(','));
   if (r.pri.length) p.set('pri', r.pri.join(','));
   if (r.cat.length) p.set('cat', r.cat.join(','));
   if (r.tab) p.set('tab', r.tab);
@@ -87,7 +102,7 @@ export function AppProvider({ ds, children }: { ds: Dataset; children: ReactNode
     const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
     nav({ ...route, [f]: next });
   }, [nav, route]);
-  const clear = useCallback((f?: FilterField) => nav(f ? { ...route, [f]: [] } : { ...route, sites: [], pri: [], cat: [] }), [nav, route]);
+  const clear = useCallback((f?: FilterField) => nav(f ? { ...route, [f]: [] } : { ...route, region: [], ft: [], sites: [], pt: [], sl: [], pri: [], cat: [], areas: [] }), [nav, route]);
   const toast = useCallback((msg: string) => {
     const id = Date.now() + Math.random();
     setToasts((t) => [...t, { id, msg }]);
@@ -95,7 +110,7 @@ export function AppProvider({ ds, children }: { ds: Dataset; children: ReactNode
   }, []);
   const period = useMemo(() => makePeriod(ds, route.pk, route.mi), [ds, route.pk, route.mi]);
   const cmpPeriod = useMemo(() => comparePeriod(ds, period, route.compare), [ds, period, route.compare]);
-  const ctx = useMemo<Ctx>(() => ({ mi: period.endMi, mis: period.mis, kind: period.kind, sites: route.sites, pri: route.pri, cat: route.cat }), [period, route.sites, route.pri, route.cat]);
+  const ctx = useMemo<Ctx>(() => makeCtx(ds, { mi: period.endMi, mis: period.mis, kind: period.kind }, route), [ds, period, route]);
   const value: AppValue = { ds, route, ctx, period, cmpPeriod, go, set, toggle, clear, paneOpen, setPaneOpen, toast, toasts };
   return <Ctx_.Provider value={value}>{children}</Ctx_.Provider>;
 }
@@ -108,3 +123,23 @@ export function useApp() {
 
 /** End month index of the comparison period. */
 export function compareMi(route: Route) { return route.compare === 'py' || route.pk === 'ytd' || route.pk === 'year' || route.pk === 'r12' ? route.mi - 12 : route.pk === 'quarter' ? route.mi - 3 : route.mi - 1; }
+
+/** Sites in scope after region, facility type and site filters ([] = all; [-1] = none match). */
+export function scopeSites(ds: Dataset, r: Pick<Route, 'region' | 'ft' | 'sites'>): number[] {
+  if (!r.region.length && !r.ft.length) return r.sites;
+  const ok = ds.sites.filter((s) => (!r.region.length || r.region.includes(s.region)) && (!r.ft.length || r.ft.includes(s.facilityType)) && (!r.sites.length || r.sites.includes(s.key))).map((s) => s.key);
+  return ok.length ? ok : [-1];
+}
+/** Service lines in scope after patient type and service line filters ([] = all; [-1] = none match). */
+export function scopeServiceLines(ds: Dataset, r: Pick<Route, 'pt' | 'sl'>): number[] {
+  if (!r.pt.length) return r.sl;
+  const ok = ds.serviceLines.filter((s) => r.pt.includes(s.patientType) && (!r.sl.length || r.sl.includes(s.key))).map((s) => s.key);
+  return ok.length ? ok : [-1];
+}
+
+export type RouteFilters = Pick<Route, FilterField>;
+
+/** Evaluation context for a period and a set of filters (route semantics). */
+export function makeCtx(ds: Dataset, p: Pick<Ctx, 'mi' | 'mis' | 'kind'>, r: RouteFilters): Ctx {
+  return { mi: p.mi, mis: p.mis, kind: p.kind, sites: scopeSites(ds, r), pri: r.pri, cat: r.cat, svc: scopeServiceLines(ds, r) };
+}

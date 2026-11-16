@@ -9,7 +9,7 @@
 // inside 14 days.
 
 import type {
-  Category, ClinicalSystem, Dataset, FinMonth, Incident, InfraMonth, Month, Pri, SecMonth, Site, SiteMonth, SystemMonth, TicketFact,
+  Category, ClinicalSystem, Dataset, FinMonth, Incident, ServiceLine, InfraMonth, Month, Pri, SecMonth, Site, SiteMonth, SystemMonth, TicketFact,
 } from './model';
 import { PRIORITIES } from './model';
 
@@ -40,12 +40,12 @@ function buildMonths(): Month[] {
 }
 
 const SITES: Site[] = [
-  { key: 0, code: 'HA', name: 'Hospital A (Main Campus)', short: 'Hospital A', beds: 420, users: 4800, devices: 6100, lead: 'Site IT Lead, Hospital A', ehr: 'EHR (enterprise instance)', weight: 0.41 },
-  { key: 1, code: 'HB', name: 'Hospital B', short: 'Hospital B', beds: 190, users: 1900, devices: 2450, lead: 'Site IT Lead, Hospital B', ehr: 'EHR (enterprise instance)', weight: 0.18 },
-  { key: 2, code: 'HC', name: 'Hospital C', short: 'Hospital C', beds: 130, users: 1300, devices: 1700, lead: 'Site IT Lead, Hospital C', ehr: 'EHR (enterprise instance)', weight: 0.13 },
-  { key: 3, code: 'HD', name: 'Hospital D', short: 'Hospital D', beds: 90, users: 850, devices: 1150, lead: 'Site IT Lead, Hospital D', ehr: 'EHR (enterprise instance)', weight: 0.09 },
-  { key: 4, code: 'HE', name: 'Hospital E (Critical Access)', short: 'Hospital E', beds: 25, users: 310, devices: 420, lead: 'Site IT Lead, Hospital E', ehr: 'EHR (enterprise instance)', weight: 0.05 },
-  { key: 5, code: 'AC', name: 'Ambulatory Clinics (12 locations)', short: 'Clinics', beds: 0, users: 1350, devices: 1900, lead: 'Site IT Lead, Clinics', ehr: 'EHR (ambulatory)', weight: 0.14 },
+  { key: 0, code: 'HA', region: 1, facilityType: 0, name: 'Hospital A (Main Campus)', short: 'Hospital A', beds: 420, users: 4800, devices: 6100, lead: 'Site IT Lead, Hospital A', ehr: 'EHR (enterprise instance)', weight: 0.41 },
+  { key: 1, code: 'HB', region: 0, facilityType: 1, name: 'Hospital B', short: 'Hospital B', beds: 190, users: 1900, devices: 2450, lead: 'Site IT Lead, Hospital B', ehr: 'EHR (enterprise instance)', weight: 0.18 },
+  { key: 2, code: 'HC', region: 2, facilityType: 1, name: 'Hospital C', short: 'Hospital C', beds: 130, users: 1300, devices: 1700, lead: 'Site IT Lead, Hospital C', ehr: 'EHR (enterprise instance)', weight: 0.13 },
+  { key: 3, code: 'HD', region: 0, facilityType: 1, name: 'Hospital D', short: 'Hospital D', beds: 90, users: 850, devices: 1150, lead: 'Site IT Lead, Hospital D', ehr: 'EHR (enterprise instance)', weight: 0.09 },
+  { key: 4, code: 'HE', region: 2, facilityType: 2, name: 'Hospital E (Critical Access)', short: 'Hospital E', beds: 25, users: 310, devices: 420, lead: 'Site IT Lead, Hospital E', ehr: 'EHR (enterprise instance)', weight: 0.05 },
+  { key: 5, code: 'AC', region: 1, facilityType: 3, name: 'Ambulatory Clinics (12 locations)', short: 'Clinics', beds: 0, users: 1350, devices: 1900, lead: 'Site IT Lead, Clinics', ehr: 'EHR (ambulatory)', weight: 0.14 },
 ];
 
 const CATEGORIES: Category[] = [
@@ -60,6 +60,28 @@ const CATEGORIES: Category[] = [
   { key: 8, name: 'Clinical device integration', rootCause: 'Vitals monitors dropping interface after network change', fix: 'Vendor patch scheduled; Clinical Apps Lead; Dec 5' },
   { key: 9, name: 'Telephony and mobile', rootCause: 'Unit phone battery wear', fix: 'Battery swap program; Field Services Lead; Dec 20' },
 ];
+/** Same region, facility type, patient type and service line groupings as the RCM analytics product. */
+const REGIONS = ['North Region', 'Central Region', 'South Region'];
+const FACILITY_TYPES = ['Regional Referral', 'Community', 'Critical Access', 'Ambulatory'];
+const PATIENT_TYPES = ['Inpatient', 'Emergency', 'Outpatient', 'Non-clinical'];
+const SERVICE_LINES: ServiceLine[] = [
+  { key: 0, name: 'Medical / Surgical', patientType: 0 }, { key: 1, name: 'Obstetrics', patientType: 0 },
+  { key: 2, name: 'Emergency', patientType: 1 },
+  { key: 3, name: 'Outpatient Surgery', patientType: 2 }, { key: 4, name: 'Imaging', patientType: 2 }, { key: 5, name: 'Laboratory', patientType: 2 },
+  { key: 6, name: 'Therapy', patientType: 2 }, { key: 7, name: 'Clinic', patientType: 2 },
+  { key: 8, name: 'Administrative and revenue cycle', patientType: 3 },
+];
+/** Share of tickets by service line: hospitals vs the ambulatory clinics. */
+const SVC_MIX_HOSPITAL = [0.27, 0.06, 0.13, 0.06, 0.07, 0.06, 0.04, 0.05, 0.26];
+const SVC_MIX_CLINIC = [0, 0, 0, 0.02, 0.06, 0.05, 0.07, 0.56, 0.24];
+/** Category leans by service line (e.g. device integration in inpatient and ED, printing everywhere). */
+function svcCatWeight(svc: number, cat: number) {
+  if (cat === 8) return svc <= 2 ? 2.2 : svc === 8 ? 0.1 : 0.6; // clinical device integration
+  if (cat === 1) return svc === 8 ? 0.5 : 1.15; // EHR access and workflow
+  if (cat === 7) return svc === 8 ? 1.6 : 0.85; // software install and request
+  return 1;
+}
+
 const CAT_MIX = [0.21, 0.15, 0.1, 0.12, 0.08, 0.07, 0.07, 0.1, 0.05, 0.05];
 
 const SYSTEMS: ClinicalSystem[] = [
@@ -114,7 +136,15 @@ export function generateDataset(): Dataset {
           if (c.key === 0) mult *= 1.06 - 0.12 * t; // self-service reset slowly working
           if (c.key === 1 && m.mi === cur) mult *= 1.12;
           const exp = base * s.weight * PRI_MIX[pri] * CAT_MIX[c.key] * mult * noise(0.12);
-          const opened = pri === 'P1' ? (rnd() < exp ? 1 : 0) : Math.round(exp + (rnd() - 0.5));
+          const total = pri === 'P1' ? (rnd() < exp ? 1 : 0) : Math.round(exp + (rnd() - 0.5));
+          if (total <= 0) continue;
+          // Split the cell across the requesting department's service line.
+          const mix = (s.key === 5 ? SVC_MIX_CLINIC : SVC_MIX_HOSPITAL).map((w, k) => w * svcCatWeight(k, c.key));
+          const wsum = mix.reduce((a, b) => a + b, 0);
+          const bySvc = new Array(mix.length).fill(0);
+          for (let k = 0; k < total; k++) { let r = rnd() * wsum; let j = 0; while (r > mix[j] && j < mix.length - 1) { r -= mix[j]; j++; } bySvc[j]++; }
+          for (let svc = 0; svc < bySvc.length; svc++) {
+          const opened = bySvc[svc];
           if (opened <= 0) continue;
           const resolved = Math.max(0, Math.round(opened * (0.985 + rnd() * 0.03)));
           // SLA rate: near target, planted misses.
@@ -128,9 +158,10 @@ export function generateDataset(): Dataset {
           for (let k = 0; k < resolved; k++) if (rnd() < pr) slaMet++;
           const respAvg = RESP_TARGET_MIN[pri] * (0.55 + rnd() * 0.35) * (s.key === 1 && m.mi === cur ? 1.3 : 1);
           const resAvg = RESOLVE_TARGET_HRS[pri] * (0.45 + rnd() * 0.35) * (s.key === 1 && m.mi === cur ? 1.25 : 1);
-          tickets.push({ mi: m.mi, site: s.key, pri, cat: c.key, opened, resolved, slaMet, respMinSum: respAvg * resolved, resolveHrsSum: resAvg * resolved });
+          tickets.push({ mi: m.mi, site: s.key, pri, cat: c.key, svc, opened, resolved, slaMet, respMinSum: respAvg * resolved, resolveHrsSum: resAvg * resolved });
           siteOpened += opened;
           siteResolved += resolved;
+          }
         }
       }
       const calls = Math.round(siteOpened * 0.62 * noise(0.05));
@@ -346,6 +377,7 @@ export function generateDataset(): Dataset {
   const ds: Dataset = {
     client: 'Sample Health System', provider: 'Convene',
     months, currentMi: cur, sites: SITES, categories: CATEGORIES, systems: SYSTEMS,
+    regions: REGIONS, facilityTypes: FACILITY_TYPES, patientTypes: PATIENT_TYPES, serviceLines: SERVICE_LINES,
     tickets, siteMonths, systemMonths, infra, security, incidents, finance,
     downtimeCostPerHour: 42000,
     projects: [

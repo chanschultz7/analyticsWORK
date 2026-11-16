@@ -15,7 +15,7 @@ export function Scorecard() {
   const { ds, ctx, route, go, period, cmpPeriod } = useApp();
   const [area, setArea] = useState<Area | 'All'>('All');
   const [only, setOnly] = useState(false);
-  const vals = SCORECARD_IDS.map((id) => evaluate(ds, id, ctx));
+  const vals = SCORECARD_IDS.filter((id) => !route.areas.length || route.areas.includes(M(id).area)).map((id) => evaluate(ds, id, ctx));
   const shown = vals.filter((v) => (area === 'All' || v.m.area === area) && (!only || v.status === 'off' || v.status === 'watch'));
   const counts = { ok: vals.filter((v) => v.status === 'ok').length, watch: vals.filter((v) => v.status === 'watch').length, off: vals.filter((v) => v.status === 'off').length, none: vals.filter((v) => v.status === 'none').length };
   const cols: Col<MetricValue>[] = [
