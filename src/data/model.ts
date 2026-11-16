@@ -82,6 +82,14 @@ export interface Incident {
   downtimeProcedures: boolean;
 }
 
+/** Mock financials for the CFO view (managed services fee, budget, projects). */
+export interface FinMonth {
+  mi: number;
+  feeFixed: number; feeDevices: number; feeOverage: number; serviceDeskShare: number;
+  budgetRun: number; projectSpend: number; projectBudget: number;
+  devices: number; users: number;
+}
+
 export interface Project {
   name: string; outcome: string; sponsor: string;
   phase: 'Initiate' | 'Plan' | 'Build' | 'Test' | 'Go-live' | 'Stabilize';
@@ -107,7 +115,9 @@ export interface Dataset {
   client: string; provider: string; months: Month[]; currentMi: number;
   sites: Site[]; categories: Category[]; systems: ClinicalSystem[];
   tickets: TicketFact[]; siteMonths: SiteMonth[]; systemMonths: SystemMonth[];
-  infra: InfraMonth[]; security: SecMonth[]; incidents: Incident[];
+  infra: InfraMonth[]; security: SecMonth[]; incidents: Incident[]; finance: FinMonth[];
+  /** Mock planning assumption: cost of one hour of clinical downtime across the system. */
+  downtimeCostPerHour: number;
   projects: Project[]; completedThisMonth: string[];
   sinceLastReview: Commitment[]; nextActions: ActionItem[]; decisions: Decision[];
   certificates: Certificate[]; eol: EolItem[];

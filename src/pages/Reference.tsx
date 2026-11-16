@@ -28,20 +28,22 @@ export function Reference() {
   );
 }
 
-interface SlaRow { label: string; ref: string; v: MetricValue; credit: number; met: Status }
+interface SlaRow { label: string; ref: string; v: MetricValue; credit: number; met: Status; missed: number }
 
 function ContractSlas() {
-  const { ds, ctx } = useApp();
+  const { ds, ctx, period } = useApp();
   const ec = { ...ctx, sites: [], pri: [], cat: [] };
-  const rows: SlaRow[] = CONTRACT_SLAS.map((s) => { const v = evaluate(ds, s.id, ec); return { label: s.label, ref: s.ref, credit: s.creditUsd, v, met: rawStatus(ds, v.m, ec, v.value) }; });
+  const rows: SlaRow[] = CONTRACT_SLAS.map((s) => { const v = evaluate(ds, s.id, ec); const missed = ec.mis.filter((mi) => rawStatus(ds, v.m, { ...ec, mi, mis: [mi], kind: 'month' }) === 'off').length;
+    return { label: s.label, ref: s.ref, credit: s.creditUsd, v, met: rawStatus(ds, v.m, ec, v.value), missed }; });
   // Contract view: met or missed against target only (trend rules do not apply to credits).
-  const atRisk = (r: SlaRow) => (r.met === 'off' ? r.credit : 0);
+  const atRisk = (r: SlaRow) => r.missed * r.credit; // one credit per month missed in the period
   const cols: Col<SlaRow>[] = [
     { key: 'label', label: 'Service level', width: 220, value: (r) => r.label },
     { key: 'ref', label: 'Contract ref.', align: 'left', value: (r) => r.ref },
     { key: 'target', label: 'Target', value: (r) => r.v.target, render: (r) => targetText(ds, r.v.m, ec, fm(r.v.m.id)), exportText: (r) => targetText(ds, r.v.m, ec, fm(r.v.m.id)) },
     { key: 'measured', label: 'Measured', value: (r) => r.v.value, render: (r) => <b>{fm(r.v.m.id)(r.v.value)}</b>, exportText: (r) => fm(r.v.m.id)(r.v.value) },
     { key: 'met', label: 'Met', align: 'center', value: (r) => r.met, render: (r) => <StatusMark status={r.met} label={r.met === 'ok' ? 'Met' : r.met === 'watch' ? 'Missed (amber band)' : 'Missed'} />, exportText: (r) => (r.met === 'ok' ? 'Met' : 'Missed') },
+    { key: 'missed', label: 'Months missed in period', value: (r) => r.missed },
     { key: 'months', label: 'Months met (12)', value: (r) => r.v.monthsMet, render: (r) => `${r.v.monthsMet} of ${r.v.monthsMeasured}` },
     { key: 'risk', label: 'Credit at risk', value: (r) => atRisk(r), render: (r) => (atRisk(r) ? <span className="txt-off">{fmt(atRisk(r), 'usd')}</span> : '$0'), exportText: (r) => atRisk(r) },
     { key: 'applied', label: 'Credit applied', value: (r) => atRisk(r), render: (r) => fmt(atRisk(r), 'usd'), exportText: (r) => atRisk(r) },
@@ -50,9 +52,9 @@ function ContractSlas() {
   const g = rows.map((r) => ({ id: r.label, data: r }));
   const total = rows.reduce((a, r) => a + atRisk(r), 0);
   return (
-    <Visual title="A1. Contract service levels and service credits" subtitle={`${ds.months[ctx.mi].label} · contract: Managed IT Services Agreement (mock), schedules B-D · credits follow the contract formula`} table={gridExport(cols, g)}>
+    <Visual title="A1. Contract service levels and service credits" subtitle={`${period.label} · contract: Managed IT Services Agreement (mock), schedules B-D · credits follow the contract formula`} table={gridExport(cols, g)}>
       <Grid caption="Contract service levels" columns={cols} rows={g} dense />
-      <div className="credit-total">Total service credits this month: <b>{fmt(total, 'usd')}</b> at risk · <b>{fmt(total, 'usd')}</b> applied · credit memo reference CM-{ds.months[ctx.mi].key.replace('-', '')}</div>
+      <div className="credit-total">Total service credits for the period: <b>{fmt(total, 'usd')}</b> at risk · <b>{fmt(total, 'usd')}</b> applied · credit memo reference CM-{ds.months[ctx.mi].key.replace('-', '')}</div>
       <p className="footnote">Convene reports every miss, including misses where no credit applies or an exclusion is claimed. Credit values are illustrative mock figures.</p>
     </Visual>
   );

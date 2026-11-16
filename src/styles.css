@@ -432,3 +432,17 @@ h1, h2, h3, h4 { margin: 0; }
   .visual, .kpi, .commentary { break-inside: avoid; }
   body { background: #fff; }
 }
+
+/* ---------- period picker ---------- */
+.period-stack { display: grid; gap: 6px; }
+.period-row { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.period-row .elt-slicer select { min-width: 100px; }
+
+/* ---------- month-by-month heat table ---------- */
+.grid.heat td { text-align: center; min-width: 64px; }
+.grid.heat td.sticky-col { text-align: left; }
+.grid.heat td.heat-ok { background: #e9f5ec; color: var(--ok); }
+.grid.heat td.heat-watch { background: var(--watch-bg); color: var(--watch); }
+.grid.heat td.heat-off { background: var(--off-bg); color: var(--off); font-weight: 600; }
+.grid.heat td.heat-none { color: var(--ink-2); }
+.grid.heat td.heat-empty { background: repeating-linear-gradient(135deg, transparent 0 6px, #f4f6f8 6px 7px); }

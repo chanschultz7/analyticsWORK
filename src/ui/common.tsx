@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Rag } from '../data/model';
 import { fmt, fmtDelta } from '../format';
 import { evaluate, M, STATUS_LABEL, STATUS_SHORT, targetText, type MetricValue, type Status, type TrendLabel } from '../metrics';
-import { compareMi, useApp } from '../state';
+import { useApp } from '../state';
 import { Icon } from './icons';
 
 export const fm = (id: string) => (v: number | null | undefined) => fmt(v ?? null, M(id).unit, M(id).digits);
@@ -95,11 +95,10 @@ export function InfoIcon({ id }: { id: string }) {
 // ---------------------------------------------------------------- KPI card
 
 export function KpiCard({ id, label, sub, onClick }: { id: string; label?: string; sub?: ReactNode; onClick?: () => void }) {
-  const { ds, ctx, route, go } = useApp();
+  const { ds, ctx, go, cmpPeriod } = useApp();
   const v = evaluate(ds, id, ctx);
   const m = v.m;
   const f = fm(id);
-  const cmp = ds.months[compareMi(route)];
   const open = onClick ?? (() => go(m.page as never));
   const disabledSite = m.scope === 'enterprise' && ctx.sites.length > 0;
   return (
@@ -121,7 +120,7 @@ export function KpiCard({ id, label, sub, onClick }: { id: string; label?: strin
             <StatusMark status={v.status} compact />
           </div>
           <div className="kpi-row">
-            {sub ?? <Delta v={v} suffix={`vs ${route.compare === 'py' ? 'PY' : cmp?.short ?? 'prior'}`} />}
+            {sub ?? <Delta v={v} suffix={`vs ${cmpPeriod.short}`} />}
           </div>
         </>
       )}

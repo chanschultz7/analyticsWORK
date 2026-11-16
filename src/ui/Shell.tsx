@@ -3,14 +3,17 @@
 
 import { useState, type ReactNode } from 'react';
 import { PRI_LABEL, PRIORITIES, type Pri } from '../data/model';
-import { compareMi, useApp, type FilterField, type PageId } from '../state';
+import { useApp, type FilterField, type PageId } from '../state';
+import { makePeriod, miOf, PERIOD_KIND_LABEL, priorName, quartersOf, years, type PeriodKind } from '../periods';
 import { Icon } from './icons';
 
 export interface PageMeta { id: PageId; group: string; label: string; title: string; question: string; slides: string; filters: FilterField[] }
 
 export const PAGES: PageMeta[] = [
-  { id: 'executive', group: 'Summary', label: 'Executive Summary', title: 'Executive Summary', question: 'How did IT run this month, and what do leaders need to know or decide?', slides: 'MOR slide 3', filters: [] },
-  { id: 'scorecard', group: 'Summary', label: 'Service Scorecard', title: 'Service Scorecard vs Targets', question: 'Which service levels met target this month, and which are trending the wrong way?', slides: 'MOR slides 4-5', filters: ['sites'] },
+  { id: 'executive', group: 'Summary', label: 'Executive', title: 'Executive Summary', question: 'How did IT run this month, and what do leaders need to know or decide?', slides: 'MOR slide 3', filters: [] },
+  { id: 'review', group: 'Summary', label: 'Qtr & Year', title: 'Quarter and Year Review', question: 'How did each quarter and month of the year perform against target, and how does the year compare with last year?', slides: 'Board / ELT view', filters: [] },
+  { id: 'financial', group: 'Summary', label: 'Financial', title: 'Financial and Value Summary', question: 'What does IT cost, are we on budget, and what did service misses and downtime cost us?', slides: 'CFO view', filters: [] },
+  { id: 'scorecard', group: 'Summary', label: 'Scorecard', title: 'Service Scorecard vs Targets', question: 'Which service levels met target this month, and which are trending the wrong way?', slides: 'MOR slides 4-5', filters: ['sites'] },
   { id: 'service-desk', group: 'Analytics', label: 'Service Desk', title: 'Service Desk: Demand, Speed and Experience', question: 'Is demand under control, and are users getting fast, good service?', slides: 'MOR slides 6-7', filters: ['sites', 'pri', 'cat'] },
   { id: 'clinical', group: 'Analytics', label: 'Clinical Apps', title: 'Clinical Applications: EHR and Clinical System Health', question: 'Were the EHR and clinical systems available when clinicians needed them?', slides: 'MOR slide 8', filters: [] },
   { id: 'infrastructure', group: 'Analytics', label: 'Infrastructure', title: 'Infrastructure Health: Stability, Protection and Capacity', question: 'Is the infrastructure stable, protected and sized for what is coming?', slides: 'MOR slide 9', filters: ['sites'] },
@@ -25,7 +28,7 @@ export const PAGE_BY_ID = Object.fromEntries(PAGES.map((p) => [p.id, p])) as Rec
 export function Header() {
   const { ds, route } = useApp();
   const scope = route.sites.length === 0 ? `All sites (${ds.sites.length})` : route.sites.length === 1 ? ds.sites[route.sites[0]].name : `${route.sites.length} sites`;
-  const closed = route.mi < ds.currentMi + 1;
+  const { period } = useApp();
   return (
     <header className="app-header">
       <div className="brand">
@@ -35,8 +38,8 @@ export function Header() {
         <span className="org">{ds.client} · {scope}</span>
       </div>
       <div className="header-meta">
-        <span>Reporting period <b>{ds.months[route.mi].label}</b><span className={`pill ${closed ? 'pill-closed' : 'pill-prelim'}`}>{closed ? 'Closed' : 'Preliminary'}</span></span>
-        <span className="hide-sm">Data through <b>{route.mi === ds.currentMi ? ds.dataThrough : ds.months[route.mi].label}</b></span>
+        <span>Reporting period <b>{period.label}</b><span className={`pill ${period.partial ? 'pill-prelim' : 'pill-closed'}`}>{period.partial ? 'To date' : 'Closed'}</span></span>
+        <span className="hide-sm">Data through <b>{period.endMi === ds.currentMi ? ds.dataThrough : ds.months[period.endMi].label}</b></span>
         <span className="fresh-ok hide-sm"><span className="dot" aria-hidden="true" />Refreshed {ds.refreshed}</span>
       </div>
       <div className="header-right">
@@ -110,8 +113,58 @@ function Slicer({ field, open: defOpen = false }: { field: FilterField; open?: b
   );
 }
 
+/**
+ * Period picker: view (month, quarter, year to date, full year, rolling 12), then year, then month
+ * or quarter. Shared by the filter pane and the Executive Summary.
+ */
+export function PeriodControls({ layout = 'stack' }: { layout?: 'stack' | 'row' }) {
+  const { ds, route, set, period, cmpPeriod } = useApp();
+  const ys = years(ds);
+  const year = period.year;
+  const months = ds.months.filter((m) => m.year === year && m.mi <= ds.currentMi);
+  const anchorFor = (y: number, month: number) => { const mi = miOf(ds, y, month); return mi >= 0 && mi <= ds.currentMi ? mi : ds.months.filter((m) => m.year === y && m.mi <= ds.currentMi).slice(-1)[0]?.mi ?? ds.currentMi; };
+  const setKind = (pk: PeriodKind) => set({ pk, mi: pk === 'year' ? anchorFor(year, 11) : route.mi });
+  const row = layout === 'row';
+  const Lbl = ({ children }: { children: string }) => (row ? <span>{children}</span> : <>{children}</>);
+  return (
+    <div className={row ? 'period-row' : 'period-stack'}>
+      <label className={row ? 'elt-slicer' : 'fld'}><Lbl>View</Lbl>
+        <select value={route.pk} onChange={(e) => setKind(e.target.value as PeriodKind)} aria-label="Period view">
+          {(Object.keys(PERIOD_KIND_LABEL) as PeriodKind[]).map((k) => <option key={k} value={k}>{PERIOD_KIND_LABEL[k]}</option>)}
+        </select>
+      </label>
+      <label className={row ? 'elt-slicer' : 'fld'}><Lbl>Year</Lbl>
+        <select value={year} onChange={(e) => set({ mi: anchorFor(Number(e.target.value), route.pk === 'year' ? 11 : ds.months[period.endMi].month) })} aria-label="Year">
+          {ys.map((y) => <option key={y} value={y}>{y}{y === ds.months[ds.currentMi].year ? ' (to date)' : ''}</option>)}
+        </select>
+      </label>
+      {route.pk === 'quarter' && (
+        <label className={row ? 'elt-slicer' : 'fld'}><Lbl>Quarter</Lbl>
+          <select value={period.quarter} onChange={(e) => { const q = Number(e.target.value); set({ mi: anchorFor(year, q * 3 + 2) }); }} aria-label="Quarter">
+            {quartersOf(ds, year).map((q) => <option key={q.q} value={q.q}>Q{q.q + 1} {makePeriod(ds, 'quarter', q.mi).partial ? '(to date)' : ''}</option>)}
+          </select>
+        </label>
+      )}
+      {(route.pk === 'month' || route.pk === 'ytd' || route.pk === 'r12') && (
+        <label className={row ? 'elt-slicer' : 'fld'}><Lbl>{route.pk === 'month' ? 'Month' : 'Through month'}</Lbl>
+          <select value={period.endMi} onChange={(e) => set({ mi: Number(e.target.value) })} aria-label="Month">
+            {[...months].reverse().map((m) => <option key={m.mi} value={m.mi}>{m.label.split(' ')[0]}</option>)}
+          </select>
+        </label>
+      )}
+      <label className={row ? 'elt-slicer' : 'fld'}><Lbl>Compare to</Lbl>
+        <select value={route.compare} onChange={(e) => set({ compare: e.target.value as 'prior' | 'py' })} aria-label="Compare to">
+          <option value="prior">{route.pk === 'month' ? 'Prior month' : route.pk === 'quarter' ? 'Prior quarter' : 'Prior year'}</option>
+          <option value="py">Same period last year</option>
+        </select>
+      </label>
+      {!row && <div className="fld-note">{period.label} vs {cmpPeriod.label}{cmpPeriod.mis.length === 0 ? ' (no data)' : ''}. Data from {ds.months[0].label}.</div>}
+    </div>
+  );
+}
+
 export function FilterPane() {
-  const { ds, route, set, clear, paneOpen, setPaneOpen } = useApp();
+  const { route, clear, paneOpen, setPaneOpen } = useApp();
   const meta = PAGE_BY_ID[route.page];
   const active = route.sites.length + route.pri.length + route.cat.length;
   if (!paneOpen) {
@@ -135,18 +188,7 @@ export function FilterPane() {
       <div className="pane-scroll">
         <section className="pane-sec">
           <h4>Reporting period</h4>
-          <label className="fld">Month
-            <select value={route.mi} onChange={(e) => set({ mi: Number(e.target.value) })}>
-              {[...ds.months].reverse().filter((m) => m.mi >= 0).map((m) => <option key={m.mi} value={m.mi}>{m.label}</option>)}
-            </select>
-          </label>
-          <label className="fld">Compare to
-            <select value={route.compare} onChange={(e) => set({ compare: e.target.value as 'prior' | 'py' })}>
-              <option value="prior">Prior month ({ds.months[route.mi - 1]?.short ?? '–'})</option>
-              <option value="py">Prior year ({ds.months[route.mi - 12]?.short ?? 'n/a'})</option>
-            </select>
-          </label>
-          <div className="fld-note">Trends show up to 13 months. Data starts {ds.months[0].label}.</div>
+          <PeriodControls />
         </section>
         <section className="pane-sec">
           <h4>Organization</h4>
@@ -174,14 +216,14 @@ export function FilterPane() {
 }
 
 export function CanvasHeader({ title, right, question }: { title?: string; right?: ReactNode; question?: string }) {
-  const { route, ds, go } = useApp();
+  const { route, go, period } = useApp();
   const meta = PAGE_BY_ID[route.page];
   return (
     <div className="canvas-head">
       <div className="canvas-title-row">
         <div>
           <nav className="crumbs" aria-label="Breadcrumb">
-            <button type="button" className="crumb" onClick={() => go('executive')}>MOR {ds.months[route.mi].label}</button>
+            <button type="button" className="crumb" onClick={() => go('executive')}>MOR · {period.label}</button>
             <span className="crumb-sep">›</span><span className="crumb muted-crumb">{meta.group}</span>
             <span className="crumb-sep">›</span><span className="crumb current">{meta.label}</span>
             <span className="crumb-ref">{meta.slides}</span>
@@ -197,8 +239,7 @@ export function CanvasHeader({ title, right, question }: { title?: string; right
 }
 
 export function AppliedFilters() {
-  const { ds, route, toggle, clear } = useApp();
-  const cmp = ds.months[compareMi(route)];
+  const { ds, route, toggle, clear, period, cmpPeriod } = useApp();
   const chips: { f: FilterField; k: number | Pri; label: string }[] = [
     ...route.sites.map((k) => ({ f: 'sites' as const, k, label: ds.sites[k]?.short ?? String(k) })),
     ...route.pri.map((k) => ({ f: 'pri' as const, k, label: PRI_LABEL[k] })),
@@ -207,7 +248,7 @@ export function AppliedFilters() {
   const FIELD = { sites: 'Site', pri: 'Priority', cat: 'Category' };
   return (
     <div className="applied" role="region" aria-label="Applied filters">
-      <span className="applied-chip fixed"><span className="chip-field">Period</span> {ds.months[route.mi].label} <span className="muted">vs {route.compare === 'py' ? 'prior year' : 'prior month'} ({cmp?.short ?? 'n/a'})</span></span>
+      <span className="applied-chip fixed"><span className="chip-field">Period</span> {period.label} <span className="muted">vs {priorName(period, route.compare)} ({cmpPeriod.label})</span></span>
       {chips.map((c) => (
         <span key={`${c.f}-${c.k}`} className="applied-chip">
           <span className="chip-field">{FIELD[c.f]}</span>

@@ -32,8 +32,10 @@ with "GitHub Actions" as the source in the repository settings).
 
 | Tab | MOR slides | What it shows |
 |---|---|---|
-| Executive Summary | 3 (and agenda, 2) | Five headline KPIs (critical system uptime, service levels met, tickets resolved, P1+P2 incidents, open critical issues), this month in brief, key points, decisions required, since last review, measures off target, 12-month trends |
-| Service Scorecard | 4-5 | Every KPI with target, prior, current, vs target, status, MoM and 3-month trend, months met (12), 13-month sparkline; filter by area or off-target only |
+| Executive | 3 (and agenda, 2) | Five headline KPIs (critical system uptime, service levels met, tickets resolved, P1+P2 incidents, open critical issues), this month in brief, key points, decisions required, since last review, measures off target, 12-month trends |
+| Qtr & Year | Board / ELT view | Every KPI by quarter (Q1-Q4), year to date vs the same months last year, and a month-by-month heat table for the selected year |
+| Financial | CFO view | Managed IT spend vs budget, total IT cost, cost per ticket / user / device, project spend vs plan, service credits, estimated cost of clinical downtime, cumulative spend and run-rate forecast, project budgets |
+| Scorecard | 4-5 | All 73 KPIs (operational, executive and financial) with target, with target, prior, current, vs target, status, MoM and 3-month trend, months met (12), 13-month sparkline; filter by area or off-target only |
 | Service Desk | 6-7 | Volume by priority, throughput, backlog by age, tickets by site / category / priority (click to filter), site table, SLA and response/resolve times by priority, recurring categories with root cause and fix, decomposition tree |
 | Clinical Apps | 8 | EHR and clinical system availability by tier, unplanned/planned downtime, interface errors, system detail |
 | Infrastructure | 9 | Uptime by tier, scheduled vs unscheduled downtime, backup, patching, change, capacity, certificate and end-of-life watch |
@@ -45,8 +47,12 @@ with "GitHub Actions" as the source in the repository settings).
 
 ## How it works
 
-- **Filters** (left pane): reporting month, compare to prior month or prior year, site, priority and
-  ticket category. Clicking a bar or table row toggles the matching filter; chips under the page title
+- **Period** (left pane, and the Executive header): choose the view (Month, Quarter, Year to date,
+  Full year, Rolling 12 months), then the **Year**, then the **Month** or **Quarter**. Compare to the
+  prior period or the same period last year. Counts and hours add up over the period, rates are
+  weighted, coverage and backlog are month-end values, capacity is the peak, and per-month targets
+  (incidents, downtime hours) scale to the period length. Mock data runs January 2024 to October 2026.
+- **Filters** (left pane): site, priority and ticket category. Clicking a bar or table row toggles the matching filter; chips under the page title
   show what is applied. Everything is stored in the URL, so a copied link reopens the same view.
 - **Status rules** follow MOR appendix A4: green meets target; amber is inside the amber band, or meets
   target with an unfavorable 3-month trend while close to target; red is outside the amber band or

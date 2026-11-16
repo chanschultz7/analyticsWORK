@@ -27,11 +27,19 @@ const PROTECTION: { id: string; check: string }[] = [
 ];
 
 export function Security() {
-  const { ds, ctx, set } = useApp();
+  const { ds, ctx, set, period, cmpPeriod } = useApp();
   const ec = { ...ctx, sites: [] };
   const mi = ctx.mi;
-  const s = ds.security[mi];
-  const p = ds.security[mi - 1];
+  // Period view: counts are totals over the period; open findings, coverage and exceptions are month-end.
+  const agg = (mis: number[]) => {
+    if (!mis.length) return undefined;
+    const xs = mis.map((m) => ds.security[m]);
+    const end = xs[xs.length - 1];
+    const tot = (f: (r: typeof end) => number) => xs.reduce((a, r) => a + f(r), 0);
+    return { ...end, incLow: tot((r) => r.incLow), incMed: tot((r) => r.incMed), incHigh: tot((r) => r.incHigh), phishDelivered: tot((r) => r.phishDelivered), phishClicks: tot((r) => r.phishClicks), failedLogins: tot((r) => r.failedLogins), lockouts: tot((r) => r.lockouts), phiEvents: tot((r) => r.phiEvents) };
+  };
+  const s = agg(ctx.mis)!;
+  const p = agg(cmpPeriod.mis);
   type R = { v: MetricValue; check: string };
   const rows: R[] = PROTECTION.map((x) => ({ v: evaluate(ds, x.id, ec), check: x.check }));
   const special = (r: R, which: 'cur' | 'prior') => {
@@ -74,18 +82,18 @@ export function Security() {
         </Visual>
         <Visual title="Critical and high findings, monthly" subtitle="Open at month end · click a month to set the period"
           table={{ columns: ['Month', 'Critical', 'High'], rows: months.map((m) => [m.label, ds.security[m.mi].vulnC, ds.security[m.mi].vulnH]) }}>
-          <Chart height={240} ariaLabel="Critical and high findings trend" onClick={(i) => months[i] && set({ mi: months[i].mi })}
+          <Chart height={240} ariaLabel="Critical and high findings trend" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}
             option={lineOption({ labels: months.map((m) => m.short), fmt: (v) => num(v), selectedIndex: months.length - 1, min: 0, series: [{ name: 'High', data: months.map((m) => ds.security[m.mi].vulnH), color: SERIES[1] }, { name: 'Critical', data: months.map((m) => ds.security[m.mi].vulnC), color: '#bb3328' }] })} />
         </Visual>
       </div>
-      <Visual title="Protection and security metrics" subtitle={`${ds.months[mi].label} · lowest coverage: ${lowest(rows)} · targets are Convene defaults, confirm per contract`} table={gridExport(cols, g)}>
+      <Visual title="Protection and security metrics" subtitle={`${period.label} · lowest coverage: ${lowest(rows)} · targets are Convene defaults, confirm per contract`} table={gridExport(cols, g)}>
         <Grid caption="Protection and security metrics" columns={cols} rows={g} dense />
       </Visual>
       <div className="row cols-2">
         <TrendVisual id="phish" title="Phishing simulation click rate, monthly" height={200} ctxOverride={{ sites: [] }} />
         <Visual title="Failed logins and lockouts, monthly" metricId="failed_logins" subtitle="Spikes are flagged when more than 30% above the prior 3-month average"
           table={{ columns: ['Month', 'Failed logins', 'Lockouts'], rows: months.map((m) => [m.label, ds.security[m.mi].failedLogins, ds.security[m.mi].lockouts]) }}>
-          <Chart height={200} ariaLabel="Failed logins and lockouts" onClick={(i) => months[i] && set({ mi: months[i].mi })}
+          <Chart height={200} ariaLabel="Failed logins and lockouts" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}
             option={lineOption({ labels: months.map((m) => m.short), fmt: (v) => num(v), selectedIndex: months.length - 1, min: 0, series: [{ name: 'Failed logins', data: months.map((m) => ds.security[m.mi].failedLogins), color: SERIES[0] }, { name: 'Lockouts ×10', data: months.map((m) => ds.security[m.mi].lockouts * 10), color: SERIES[1] }] })} />
         </Visual>
       </div>

@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { generateDataset } from './data/generate';
 import { Clinical } from './pages/Clinical';
 import { Executive } from './pages/Executive';
+import { Financial } from './pages/Financial';
+import { Review } from './pages/Review';
 import { Incidents } from './pages/Incidents';
 import { Infrastructure } from './pages/Infrastructure';
 import { Projects } from './pages/Projects';
@@ -14,7 +16,7 @@ import { AppProvider, useApp, type PageId } from './state';
 import { FilterPane, Header, NavTabs, StatusBar, Toasts } from './ui/Shell';
 
 const VIEWS: Record<PageId, () => JSX.Element> = {
-  executive: Executive, scorecard: Scorecard, 'service-desk': ServiceDesk, clinical: Clinical, infrastructure: Infrastructure,
+  executive: Executive, review: Review, financial: Financial, scorecard: Scorecard, 'service-desk': ServiceDesk, clinical: Clinical, infrastructure: Infrastructure,
   incidents: Incidents, security: Security, sites: Sites, projects: Projects, reference: Reference,
 };
 

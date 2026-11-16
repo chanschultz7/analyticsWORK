@@ -9,7 +9,7 @@
 // inside 14 days.
 
 import type {
-  Category, ClinicalSystem, Dataset, Incident, InfraMonth, Month, Pri, SecMonth, Site, SiteMonth, SystemMonth, TicketFact,
+  Category, ClinicalSystem, Dataset, FinMonth, Incident, InfraMonth, Month, Pri, SecMonth, Site, SiteMonth, SystemMonth, TicketFact,
 } from './model';
 import { PRIORITIES } from './model';
 
@@ -25,9 +25,9 @@ function mulberry32(seed: number) {
 }
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const N_MONTHS = 18;
-const START_YEAR = 2025;
-const START_MONTH = 4; // May 2025 (0-based)
+const N_MONTHS = 34;
+const START_YEAR = 2024;
+const START_MONTH = 0; // January 2024 (0-based): full 2024 and 2025, 2026 through October
 
 function buildMonths(): Month[] {
   return Array.from({ length: N_MONTHS }, (_, mi) => {
@@ -278,6 +278,18 @@ export function generateDataset(): Dataset {
         actionStatus: mi >= cur - 2 && k === 0 ? 'Open' : 'Closed',
       });
     }
+    if (mi === cur - 13) {
+      add(mi, 8, 'P1', 'PACS and imaging', [0, 1], 1.8, { impact: 'Imaging unavailable in the ED and radiology at Hospitals A and B; films read on modality consoles', resolution: 'Failed database node restored from replica', rootCause: 'Database cluster split after a storage path failure', action: 'Add path redundancy and cluster quorum monitoring', owner: 'Imaging Systems Lead' });
+    }
+    if (mi === cur - 19) {
+      add(mi, 22, 'P1', 'Network: core', [0, 1, 2, 3, 4, 5], 1.4, { impact: 'All sites lost access to enterprise apps; downtime procedures for 84 min', resolution: 'Core switch rolled back to prior firmware', rootCause: 'Core switch firmware defect after a scheduled upgrade', action: 'Stage core upgrades in the lab first; add rollback plan to change template', owner: 'Network Lead' });
+    }
+    if (mi === cur - 26) {
+      add(mi, 3, 'P1', 'EHR', [0, 1, 2, 3, 4, 5], 2.1, { impact: 'All sites on downtime procedures for 2.1 hrs', resolution: 'Application tier failed over to the secondary data center', rootCause: 'Expired internal certificate on the application tier', action: 'Add all EHR certificates to the 60-day watch', owner: 'Clinical Apps Lead' });
+    }
+    if (mi === cur - 31) {
+      add(mi, 17, 'P1', 'Email', [0, 1, 2, 3, 4, 5], 3.5, { clinicalDowntimeHrs: 0, downtimeProcedures: false, impact: 'Email unavailable system-wide; clinical messaging unaffected', resolution: 'Mail flow restored after connector reconfiguration', rootCause: 'Cloud mail connector change by the provider', action: 'Monitor mail flow with synthetic messages', owner: 'Messaging Lead' });
+    }
     if (mi === cur - 7) {
       add(mi, 11, 'P1', 'EHR', [0, 1, 2, 3, 4, 5], 1.1, { impact: 'All sites on downtime procedures for 66 min', resolution: 'Failed application node removed from pool', rootCause: 'Memory leak in vendor patch', action: 'Apply vendor hotfix; add memory alerting', owner: 'Clinical Apps Lead' });
     }
@@ -311,10 +323,31 @@ export function generateDataset(): Dataset {
   const lastMonthOpen = incidents.find((i) => i.mi === cur - 1 && i.actionStatus === 'Open');
   if (lastMonthOpen) { lastMonthOpen.actionStatus = 'Overdue'; lastMonthOpen.due = 'Oct 31'; }
 
+  // ---------------------------------------------------------------- financial (mock)
+  // Managed services fee = fixed monthly fee + per-device charge + ticket overage above a baseline.
+  // Budget is set per fiscal year (calendar year in the mock). Project spend follows the portfolio.
+  const deviceCount = SITES.reduce((a, s) => a + s.devices, 0);
+  const userCount = SITES.reduce((a, s) => a + s.users, 0);
+  const finance: FinMonth[] = months.map((m) => {
+    const opened = tickets.filter((x) => x.mi === m.mi).reduce((a, x) => a + x.opened, 0);
+    const devices = Math.round(deviceCount * (0.93 + 0.07 * (m.mi / (N_MONTHS - 1))));
+    const fixed = m.year === 2024 ? 352000 : m.year === 2025 ? 366000 : 380000;
+    const perDevice = devices * 12.5;
+    const overage = Math.max(0, opened - 3300) * 38;
+    const projectSpend = Math.round((m.year === 2026 ? 145000 : 110000) * (0.75 + rnd() * 0.5));
+    const budgetRun = m.year === 2024 ? 525000 : m.year === 2025 ? 545000 : 560000;
+    return {
+      mi: m.mi, feeFixed: fixed, feeDevices: Math.round(perDevice), feeOverage: Math.round(overage),
+      serviceDeskShare: 0.36, budgetRun, projectSpend, projectBudget: m.year === 2026 ? 140000 : 115000,
+      devices, users: Math.round(userCount * (0.95 + 0.05 * (m.mi / (N_MONTHS - 1)))),
+    };
+  });
+
   const ds: Dataset = {
     client: 'Sample Health System', provider: 'Convene',
     months, currentMi: cur, sites: SITES, categories: CATEGORIES, systems: SYSTEMS,
-    tickets, siteMonths, systemMonths, infra, security, incidents,
+    tickets, siteMonths, systemMonths, infra, security, incidents, finance,
+    downtimeCostPerHour: 42000,
     projects: [
       { name: 'Storage platform refresh', outcome: 'retire end-of-life arrays; automatic failover', sponsor: 'Chief Information Officer', phase: 'Build', schedule: 'A', scope: 'G', budget: 'G', overall: 'A', milestone: 'Production cutover', milestoneDate: 'Jan 18', blocker: 'Approve weekend downtime window by Nov 25', site: null, pctComplete: 0.46, budgetUsd: 1850000, spentUsd: 790000 },
       { name: 'Thin-client replacement', outcome: '220 nursing workstations replaced', sponsor: 'Chief Nursing Officer', phase: 'Build', schedule: 'G', scope: 'G', budget: 'G', overall: 'G', milestone: 'Units 4-6 deployed', milestoneDate: 'Dec 12', blocker: 'None', site: 0, pctComplete: 0.58, budgetUsd: 310000, spentUsd: 171000 },

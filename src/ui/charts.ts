@@ -54,7 +54,7 @@ export function barOption(o: {
     markLine: si === o.series.length - 1 ? targetLine(o.target, o.fmt, o.horizontal ? 'x' : 'y') : undefined,
     emphasis: { focus: 'none' as const },
   }));
-  const vAxis = valueAxis(o.fmt, { min: o.min, max: o.max, minInterval: allInt(o.series) ? 1 : undefined });
+  const vAxis = valueAxis(o.fmt, { min: o.min, max: o.max, minInterval: allInt(o.series) ? 1 : undefined, splitNumber: o.horizontal ? 3 : undefined });
   const cAxis = catAxis(o.labels, o.horizontal ? { inverse: true, axisLabel: { color: INK.secondary, fontSize: 10.5, width: 150, overflow: 'truncate' } } : { axisLabel: { color: INK.secondary, fontSize: 10, interval: 0 } });
   return {
     ...base, grid: { ...base.grid, top: multi ? 26 : 12, right: o.horizontal ? 54 : 18 },

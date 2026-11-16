@@ -4,14 +4,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Dataset, Pri } from './data/model';
 import type { Ctx } from './metrics';
+import { comparePeriod, makePeriod, type Period, type PeriodKind } from './periods';
 
-export type PageId = 'executive' | 'scorecard' | 'service-desk' | 'clinical' | 'infrastructure' | 'incidents' | 'security' | 'sites' | 'projects' | 'reference';
+export type PageId = 'executive' | 'review' | 'financial' | 'scorecard' | 'service-desk' | 'clinical' | 'infrastructure' | 'incidents' | 'security' | 'sites' | 'projects' | 'reference';
 export type Compare = 'prior' | 'py';
 export type FilterField = 'sites' | 'pri' | 'cat';
 
-interface Route { page: PageId; mi: number; compare: Compare; sites: number[]; pri: Pri[]; cat: number[]; tab?: string; site?: number }
+interface Route { page: PageId; mi: number; pk: PeriodKind; compare: Compare; sites: number[]; pri: Pri[]; cat: number[]; tab?: string; site?: number }
 
-const PAGES: PageId[] = ['executive', 'scorecard', 'service-desk', 'clinical', 'infrastructure', 'incidents', 'security', 'sites', 'projects', 'reference'];
+const PAGES: PageId[] = ['executive', 'review', 'financial', 'scorecard', 'service-desk', 'clinical', 'infrastructure', 'incidents', 'security', 'sites', 'projects', 'reference'];
 
 function parse(hash: string, ds: Dataset): Route {
   const [path, q = ''] = hash.replace(/^#\/?/, '').split('?');
@@ -21,6 +22,7 @@ function parse(hash: string, ds: Dataset): Route {
   return {
     page: (PAGES as string[]).includes(path) ? (path as PageId) : 'executive',
     mi: Number.isInteger(mi) && p.has('m') && mi >= 0 && mi <= ds.currentMi ? mi : ds.currentMi,
+    pk: (['month', 'quarter', 'ytd', 'year', 'r12'] as const).find((k) => k === p.get('pk')) ?? 'month',
     compare: p.get('cmp') === 'py' ? 'py' : 'prior',
     sites: list('site').map(Number).filter((n) => n >= 0 && n < ds.sites.length),
     pri: list('pri') as Pri[],
@@ -33,6 +35,7 @@ function parse(hash: string, ds: Dataset): Route {
 function build(r: Route, ds: Dataset): string {
   const p = new URLSearchParams();
   if (r.mi !== ds.currentMi) p.set('m', String(r.mi));
+  if (r.pk !== 'month') p.set('pk', r.pk);
   if (r.compare === 'py') p.set('cmp', 'py');
   if (r.sites.length) p.set('site', r.sites.join(','));
   if (r.pri.length) p.set('pri', r.pri.join(','));
@@ -47,6 +50,8 @@ interface AppValue {
   ds: Dataset;
   route: Route;
   ctx: Ctx;
+  /** The reporting period and its comparison period (per the compare setting). */
+  period: Period; cmpPeriod: Period;
   go: (page: PageId, extra?: Partial<Route>) => void;
   set: (patch: Partial<Route>) => void;
   toggle: (f: FilterField, v: number | Pri) => void;
@@ -88,8 +93,10 @@ export function AppProvider({ ds, children }: { ds: Dataset; children: ReactNode
     setToasts((t) => [...t, { id, msg }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
   }, []);
-  const ctx = useMemo<Ctx>(() => ({ mi: route.mi, sites: route.sites, pri: route.pri, cat: route.cat }), [route.mi, route.sites, route.pri, route.cat]);
-  const value: AppValue = { ds, route, ctx, go, set, toggle, clear, paneOpen, setPaneOpen, toast, toasts };
+  const period = useMemo(() => makePeriod(ds, route.pk, route.mi), [ds, route.pk, route.mi]);
+  const cmpPeriod = useMemo(() => comparePeriod(ds, period, route.compare), [ds, period, route.compare]);
+  const ctx = useMemo<Ctx>(() => ({ mi: period.endMi, mis: period.mis, kind: period.kind, sites: route.sites, pri: route.pri, cat: route.cat }), [period, route.sites, route.pri, route.cat]);
+  const value: AppValue = { ds, route, ctx, period, cmpPeriod, go, set, toggle, clear, paneOpen, setPaneOpen, toast, toasts };
   return <Ctx_.Provider value={value}>{children}</Ctx_.Provider>;
 }
 
@@ -99,5 +106,5 @@ export function useApp() {
   return v;
 }
 
-/** Comparison month index for the current route. */
-export function compareMi(route: Route) { return route.compare === 'py' ? route.mi - 12 : route.mi - 1; }
+/** End month index of the comparison period. */
+export function compareMi(route: Route) { return route.compare === 'py' || route.pk === 'ytd' || route.pk === 'year' || route.pk === 'r12' ? route.mi - 12 : route.pk === 'quarter' ? route.mi - 3 : route.mi - 1; }

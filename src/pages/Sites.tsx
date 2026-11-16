@@ -26,7 +26,7 @@ export function Sites() {
   const site = ds.sites[siteKey] ?? ds.sites[0];
   const sc: Ctx = { ...ctx, sites: [site.key], pri: [], cat: [] };
   const ac: Ctx = { ...ctx, sites: [], pri: [], cat: [] };
-  const sm = siteRows(ds, sc)[0];
+  const sm = siteRows(ds, { ...sc, mis: [sc.mi] })[0];
   const share = (evaluate(ds, 'tickets_opened', sc).value ?? 0) / Math.max(1, evaluate(ds, 'tickets_opened', ac).value ?? 1);
   const resolved = evaluate(ds, 'tickets_resolved', sc);
   const resolvedAll = evaluate(ds, 'tickets_resolved', ac);
@@ -69,7 +69,7 @@ export function Sites() {
           return (
             <Visual key={id} title={id === 'over7' ? 'Tickets open > 7 days' : id === 'mi_p1p2' ? 'P1 and P2 incidents' : v.m.short ?? v.m.name} metricId={id} subtitle="12 months · site vs all sites"
               table={{ columns: ['Month', site.short, 'All sites'], rows: v.trend.map((t, i) => [ds.months[t.mi].label, f(t.value), f(a.trend[i]?.value)]) }}>
-              <Chart height={170} ariaLabel={`${v.m.name} trend for ${site.name}`} onClick={(i) => v.trend[i] && set({ mi: v.trend[i].mi })}
+              <Chart height={170} ariaLabel={`${v.m.name} trend for ${site.name}`} onClick={(i) => v.trend[i] && set({ mi: v.trend[i].mi, pk: 'month' })}
                 option={lineOption({ labels: v.trend.map((t) => ds.months[t.mi].short), fmt: f, target: id === 'mi_p1p2' ? null : v.target, selectedIndex: v.trend.length - 1,
                   series: [{ name: site.short, data: v.trend.map((t) => t.value), color: SERIES[0], type: id === 'mi_p1p2' ? 'bar' : 'line' }, ...(allSeries ? [{ name: 'All sites', data: allSeries, color: COMPARE, dashed: true }] : [])] })} />
             </Visual>
@@ -92,7 +92,7 @@ interface CmpRow { key: number; name: string; vals: Record<string, ReturnType<ty
 const CMP = ['tickets_opened', 'sla_all', 'over7', 'fcr', 'csat', 'network', 'patch30', 'crit7', 'mi_p1p2'];
 
 function SiteComparison({ onPick, current }: { onPick: (k: number) => void; current: number }) {
-  const { ds, ctx } = useApp();
+  const { ds, ctx, period } = useApp();
   const rows: CmpRow[] = ds.sites.map((s) => ({ key: s.key, name: s.name, vals: Object.fromEntries(CMP.map((id) => [id, evaluate(ds, id, { ...ctx, sites: [s.key], pri: [], cat: [] }, 1)])) }));
   const cols: Col<CmpRow>[] = [
     { key: 'name', label: 'Site', width: 220, value: (r) => r.name },
@@ -103,7 +103,7 @@ function SiteComparison({ onPick, current }: { onPick: (k: number) => void; curr
   ];
   const g = rows.map((r) => ({ id: String(r.key), data: r }));
   return (
-    <Visual title="Site comparison" subtitle={`${ds.months[ctx.mi].label} · every site on the same measures · click a row to open its tear sheet`} table={gridExport(cols, g)}>
+    <Visual title="Site comparison" subtitle={`${period.label} · every site on the same measures · click a row to open its tear sheet`} table={gridExport(cols, g)}>
       <Grid caption="Site comparison" columns={cols} rows={g} dense selected={(r) => r.key === current} onRowClick={(r) => onPick(r.key)} />
     </Visual>
   );

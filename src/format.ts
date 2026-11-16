@@ -12,7 +12,7 @@ export function fmt(v: number | null | undefined, unit: Unit, digits?: number): 
     case 'sec': return `${nf(digits ?? 0).format(v)} sec`;
     case 'days': return `${nf(digits ?? 1).format(v)} days`;
     case 'score': return nf(digits ?? 2).format(v);
-    case 'usd': return v >= 1e6 ? `$${nf(2).format(v / 1e6)}M` : v >= 1e3 ? `$${nf(0).format(v / 1e3)}k` : `$${nf(0).format(v)}`;
+    case 'usd': if (v < 0) return `−${fmt(-v, 'usd')}`; return v >= 1e6 ? `$${nf(2).format(v / 1e6)}M` : v >= 1e3 ? `$${nf(0).format(v / 1e3)}k` : `$${nf(0).format(v)}`;
   }
 }
 
