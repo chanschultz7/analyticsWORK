@@ -373,6 +373,19 @@ export function generateDataset(): Dataset {
       security: 'No PHI exposure events. Critical vulnerabilities continue to fall and mean time to patch critical CVEs is inside target. The phishing click rate (6.1%) is above the 5% target; three departments account for half of the clicks. Failed logins and lockouts spiked mid-month from a password-spray attempt that MFA blocked.',
     },
     nextReview: { when: 'December 10, 2026, 10:00 AM, Hospital A boardroom and video link', preRead: 'December 5, 2026', distribution: 'IT steering committee' },
+    servicesInScope: [
+      { service: 'Service desk and end-user support', inScope: true, page: 'service-desk', pageLabel: 'Service Desk' },
+      { service: 'Clinical application and EHR support', inScope: true, page: 'clinical', pageLabel: 'Clinical Applications' },
+      { service: 'Network, hosting, email and backup', inScope: true, page: 'infrastructure', pageLabel: 'Infrastructure Health' },
+      { service: 'Managed security services', inScope: true, page: 'security', pageLabel: 'Security and Compliance' },
+      { service: 'Compliance support (HIPAA)', inScope: true, page: 'security', pageLabel: 'Security and Compliance' },
+      { service: 'Projects and advisory', inScope: true, page: 'projects', pageLabel: 'Projects and Initiatives' },
+    ],
+    team: [
+      { role: 'Client Service Executive', contact: 'cse@example.com' },
+      { role: 'IT Service Delivery Lead', contact: 'delivery@example.com' },
+      { role: 'General inquiries', contact: 'support@example.com · (000) 000-0000' },
+    ],
     dataThrough: 'Oct 31, 2026', refreshed: 'Nov 12, 2026 6:00 AM',
   };
   return ds;

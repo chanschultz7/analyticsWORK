@@ -173,7 +173,21 @@ export function Executive() {
             </button>
           ))}
         </div>
-        <p className="elt-foot">Security incidents this month: {s ? s.incLow + s.incMed + s.incHigh : '–'} · Open critical vulnerabilities: {s?.vulnC ?? '–'} · PHI exposure events: {s?.phiEvents ?? '–'}. All figures are mock data.</p>
+        <div className="elt-table">
+          <table>
+            <thead><tr><th className="al-left">Service</th><th className="al-center">In scope</th><th className="al-left">Pages</th></tr></thead>
+            <tbody>
+              {ds.servicesInScope.map((x) => (
+                <tr key={x.service} className="clickable" onClick={() => go(x.page as PageId)}>
+                  <td className="al-left">{x.service}</td>
+                  <td className="al-center">{x.inScope ? <span className="txt-ok">Yes</span> : <span className="muted">No</span>}</td>
+                  <td className="al-left"><button type="button" className="link">{x.pageLabel} ›</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="elt-foot">Major incidents, the scorecard and actions apply to every client. Security incidents this month: {s ? s.incLow + s.incMed + s.incHigh : '–'} · Open critical vulnerabilities: {s?.vulnC ?? '–'} · PHI exposure events: {s?.phiEvents ?? '–'}. All figures are mock data.</p>
       </section>
     </div>
   );

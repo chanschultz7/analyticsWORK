@@ -69,6 +69,9 @@ export function Projects() {
       <div className="next-review">
         <b>Next review:</b> {ds.nextReview.when} · <b>Pre-read sent:</b> {ds.nextReview.preRead} · <b>Distribution:</b> {ds.nextReview.distribution}
       </div>
+      <div className="next-review">
+        <b>Your Convene team:</b> {ds.team.map((t) => `${t.role} (${t.contact})`).join(' · ')}
+      </div>
     </div>
   );
 }

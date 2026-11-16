@@ -114,5 +114,9 @@ export interface Dataset {
   siteActions: Record<number, string[]>;
   commentary: Commentary;
   nextReview: { when: string; preRead: string; distribution: string };
+  /** MOR slide 2: services in scope and the pages that cover them. */
+  servicesInScope: { service: string; inScope: boolean; page: string; pageLabel: string }[];
+  /** MOR slide 14: the provider team (roles only in the mock). */
+  team: { role: string; contact: string }[];
   dataThrough: string; refreshed: string;
 }
