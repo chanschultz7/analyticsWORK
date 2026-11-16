@@ -82,7 +82,7 @@ export function lineOption(o: { labels: string[]; series: Series[]; fmt: (v: num
     legend: legend(series.length > 1),
     tooltip: { ...tooltip, trigger: 'axis', valueFormatter: (v) => (v === null || v === undefined ? '–' : o.fmt(Number(v))) },
     xAxis: catAxis(o.labels, { boundaryGap: o.series.some((s) => s.type === 'bar') }),
-    yAxis: valueAxis(o.fmt, { min: o.min, max: o.max, scale: o.min === undefined, minInterval: allInt(o.series) ? 1 : undefined }),
+    yAxis: valueAxis(o.fmt, { min: o.min ?? (o.series.some((x) => x.type === 'bar') ? 0 : undefined), max: o.max, scale: o.min === undefined && !o.series.some((x) => x.type === 'bar'), minInterval: allInt(o.series) ? 1 : undefined }),
     series,
   } as EChartsOption;
 }
