@@ -6,9 +6,15 @@ product with the same layout and interaction model as the RCM analytics prototyp
 page tabs, a filter pane, KPI cards with target, status and trend, charts you can click to filter,
 dense analytical tables, a decomposition tree and "what leadership should know" commentary.
 
-**All data is mock.** "Sample Health System", Hospitals A to E, the clinics, the systems, the people
-(shown as roles) and every figure are fictional and not tied to any real hospital, health system,
-vendor or person.
+**All data is mock.** "Sample Rural Health System", its 12 sites, the systems, the people (shown as
+roles) and every figure are fictional and not tied to any real hospital, health system, vendor or person.
+
+The mock client is a rural health system of about 3,900 users and 5,300 devices: one regional hub
+hospital, four community hospitals, six critical access hospitals and a rural health clinic network,
+across five U.S. regions (Southeast 5 sites, Southwest 2, Midwest 2, Mountain West 2, Northeast 1).
+Volumes and costs are sized to match: about 1,850 tickets a month, about $240k a month in managed
+services, 1-3 major incidents a month, and rural realities such as carrier circuit outages at
+critical access sites and telehealth on thin links.
 
 ## Run
 
