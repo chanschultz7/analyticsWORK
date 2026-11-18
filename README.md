@@ -57,7 +57,7 @@ with "GitHub Actions" as the source in the repository settings).
   | Section | RCM analytics | IT dashboard |
   |---|---|---|
   | Date | Period type, period, compare to | View (month, quarter, YTD, full year, rolling 12), year, month or quarter, compare to |
-  | Organization | Region, facility type, hospital | Region, facility type, site (same regions and facility types; sites follow region and type) |
+  | Organization | Region, facility type, hospital | Region (five U.S. regions), facility type (same types, plus Rural Health Clinic), site; sites follow region and type |
   | Payer | Payor group, payer | Not used: IT tickets, outages and costs are not billed by payer |
   | Service | Patient type, service line | Patient type and service line of the requesting department (same groupings, plus Non-clinical / Administrative and revenue cycle); applies to ticket measures |
   | Metrics | RCM area | IT area (limits KPIs in the scorecard, quarter and year review and definitions) |

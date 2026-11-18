@@ -142,18 +142,18 @@ function respMetric(p: Pri, code: string, kind: 'resp' | 'res'): MetricDef {
 
 /** Contract service levels used for "Service levels met" and appendix A1. */
 export const CONTRACT_SLAS: { id: string; label: string; ref: string; creditUsd: number }[] = [
-  { id: 'resp_p1', label: 'P1 response time', ref: 'Sch. B 2.1', creditUsd: 7500 },
-  { id: 'res_p1', label: 'P1 service restored', ref: 'Sch. B 2.2', creditUsd: 10000 },
-  { id: 'resp_p2', label: 'P2 response time', ref: 'Sch. B 2.3', creditUsd: 4000 },
-  { id: 'sla_p2', label: 'P2 resolved within SLA', ref: 'Sch. B 2.4', creditUsd: 5000 },
-  { id: 'sla_p3', label: 'P3 resolved within SLA', ref: 'Sch. B 2.5', creditUsd: 2500 },
-  { id: 'sla_p4', label: 'P4 resolved within SLA', ref: 'Sch. B 2.5', creditUsd: 1500 },
-  { id: 'asa', label: 'Service desk speed to answer', ref: 'Sch. B 3.1', creditUsd: 2000 },
-  { id: 'abandon', label: 'Call abandonment rate', ref: 'Sch. B 3.2', creditUsd: 2000 },
-  { id: 'ehr_avail', label: 'EHR availability', ref: 'Sch. C 1.1', creditUsd: 15000 },
-  { id: 'network', label: 'Network availability', ref: 'Sch. C 1.3', creditUsd: 6000 },
-  { id: 'backup', label: 'Backup success rate', ref: 'Sch. C 2.1', creditUsd: 3000 },
-  { id: 'crit7', label: 'Critical patches within 7 days', ref: 'Sch. D 1.2', creditUsd: 4000 },
+  { id: 'resp_p1', label: 'P1 response time', ref: 'Sch. B 2.1', creditUsd: 3000 },
+  { id: 'res_p1', label: 'P1 service restored', ref: 'Sch. B 2.2', creditUsd: 4000 },
+  { id: 'resp_p2', label: 'P2 response time', ref: 'Sch. B 2.3', creditUsd: 1500 },
+  { id: 'sla_p2', label: 'P2 resolved within SLA', ref: 'Sch. B 2.4', creditUsd: 2000 },
+  { id: 'sla_p3', label: 'P3 resolved within SLA', ref: 'Sch. B 2.5', creditUsd: 1000 },
+  { id: 'sla_p4', label: 'P4 resolved within SLA', ref: 'Sch. B 2.5', creditUsd: 600 },
+  { id: 'asa', label: 'Service desk speed to answer', ref: 'Sch. B 3.1', creditUsd: 800 },
+  { id: 'abandon', label: 'Call abandonment rate', ref: 'Sch. B 3.2', creditUsd: 800 },
+  { id: 'ehr_avail', label: 'EHR availability', ref: 'Sch. C 1.1', creditUsd: 6000 },
+  { id: 'network', label: 'Network availability', ref: 'Sch. C 1.3', creditUsd: 2500 },
+  { id: 'backup', label: 'Backup success rate', ref: 'Sch. C 2.1', creditUsd: 1200 },
+  { id: 'crit7', label: 'Critical patches within 7 days', ref: 'Sch. D 1.2', creditUsd: 1600 },
 ];
 
 export const METRICS: MetricDef[] = [
@@ -191,17 +191,17 @@ export const METRICS: MetricDef[] = [
     compute: (ds, c) => { const f = finRows(ds, c); return ratio(sum(f, feeOf), sum(f, (x) => x.budgetRun)); },
   },
   {
-    id: 'cost_ticket', code: 'FN-03', name: 'Cost per ticket resolved', short: 'Cost per ticket', area: 'Financial', unit: 'usd', target: 60, better: 'down', amber: 5, targetText: '≤ $60',
+    id: 'cost_ticket', code: 'FN-03', name: 'Cost per ticket resolved', short: 'Cost per ticket', area: 'Financial', unit: 'usd', target: 48, better: 'down', amber: 4, targetText: '≤ $48',
     definition: 'Service desk share of the managed services fee ÷ tickets resolved.', source: 'Invoices; ITSM', owner: 'Chief Financial Officer', scope: 'enterprise', page: 'financial',
     compute: (ds, c) => ratio(sum(finRows(ds, c), (f) => feeOf(f) * f.serviceDeskShare), sum(ticketRows(ds, { ...c, sites: [], pri: [], cat: [], svc: [] }), (x) => x.resolved)),
   },
   {
-    id: 'cost_user', code: 'FN-04', name: 'IT cost per user per month', short: 'Cost per user / month', area: 'Financial', unit: 'usd', target: 55, better: 'down', amber: 3, targetText: '≤ $55',
+    id: 'cost_user', code: 'FN-04', name: 'IT cost per user per month', short: 'Cost per user / month', area: 'Financial', unit: 'usd', target: 65, better: 'down', amber: 3, targetText: '≤ $65',
     definition: 'Managed services spend ÷ active users, per month.', source: 'Invoices; identity platform', owner: 'Chief Financial Officer', scope: 'enterprise', page: 'financial',
     compute: (ds, c) => { const f = finRows(ds, c); return ratio(sum(f, feeOf), sum(f, (x) => x.users)); },
   },
   {
-    id: 'cost_device', code: 'FN-05', name: 'IT cost per device per month', short: 'Cost per device / month', area: 'Financial', unit: 'usd', target: 42, better: 'down', amber: 2, targetText: '≤ $42',
+    id: 'cost_device', code: 'FN-05', name: 'IT cost per device per month', short: 'Cost per device / month', area: 'Financial', unit: 'usd', target: 48, better: 'down', amber: 2, targetText: '≤ $48',
     definition: 'Managed services spend ÷ managed devices, per month.', source: 'Invoices; asset inventory', owner: 'Chief Financial Officer', scope: 'enterprise', page: 'financial',
     compute: (ds, c) => { const f = finRows(ds, c); return ratio(sum(f, feeOf), sum(f, (x) => x.devices)); },
   },
@@ -212,7 +212,7 @@ export const METRICS: MetricDef[] = [
   },
   {
     id: 'downtime_cost', code: 'FN-07', name: 'Estimated cost of clinical downtime', short: 'Downtime cost (est.)', area: 'Financial', unit: 'usd', target: null, better: 'down',
-    definition: 'Clinical downtime hours from P1/P2 incidents × planning cost per hour (mock assumption: $42,000 per hour).', source: 'Incident register; finance assumption', owner: 'Chief Financial Officer', scope: 'site', page: 'financial',
+    definition: 'Clinical downtime hours from P1/P2 incidents × planning cost per hour (mock assumption for a rural system: $9,000 per hour).', source: 'Incident register; finance assumption', owner: 'Chief Financial Officer', scope: 'site', page: 'financial',
     compute: (ds, c) => (c.mis.length ? sum(incidentsIn(ds, c), (i) => i.clinicalDowntimeHrs) * ds.downtimeCostPerHour : null),
   },
   {
@@ -267,10 +267,10 @@ export const METRICS: MetricDef[] = [
     agg: 'last', compute: (ds, c) => (c.mis.length ? sum(siteRows(ds, c), (x) => x.backlogOpen) : null),
   },
   {
-    id: 'over7', code: 'SD-21', name: 'Tickets open more than 7 days', short: 'Open > 7 days', area: 'Service Desk', unit: 'count', target: 60, better: 'down', amber: 15,
-    targetText: '≤ 60 (scaled to the sites selected)', definition: 'Open incidents and requests at month end older than 7 calendar days.', source: ITSM, owner: 'Service Desk Manager', scope: 'site', page: 'service-desk',
+    id: 'over7', code: 'SD-21', name: 'Tickets open more than 7 days', short: 'Open > 7 days', area: 'Service Desk', unit: 'count', target: 32, better: 'down', amber: 8,
+    targetText: '≤ 32 (scaled to the sites selected)', definition: 'Open incidents and requests at month end older than 7 calendar days.', source: ITSM, owner: 'Service Desk Manager', scope: 'site', page: 'service-desk',
     agg: 'last', compute: (ds, c) => (c.mis.length ? sum(siteRows(ds, c), (x) => x.backlogOver7) : null),
-    targetFn: (ds, c) => Math.round(60 * usersShare(ds, c)),
+    targetFn: (ds, c) => Math.max(1, Math.round(32 * usersShare(ds, c))),
   },
   {
     id: 'reopen', code: 'SD-22', name: 'Reopened ticket rate', short: 'Reopened', area: 'Service Desk', unit: 'pct', target: 0.05, better: 'down', amber: 0.01,
@@ -297,6 +297,11 @@ export const METRICS: MetricDef[] = [
     id: 'clin_below', code: 'CS-03', name: 'Clinical systems below target', short: 'Systems below target', area: 'Clinical Systems', unit: 'count', target: 0, better: 'down', amber: 1,
     definition: 'Clinical systems whose availability missed their tier target (P1 99.9%, general 99.5%).', source: MON, owner: 'Clinical Apps Lead', scope: 'enterprise', page: 'clinical',
     compute: (ds, c) => (c.mis.length ? ds.systems.filter((s) => (systemAvailability(ds, c.mis, s.key) ?? 1) < (s.tier === 'P1' ? 0.999 : 0.995)).length : null),
+  },
+  {
+    id: 'telehealth', code: 'CS-06', name: 'Telehealth platform availability', short: 'Telehealth', area: 'Clinical Systems', unit: 'pct', digits: 2, target: 0.995, better: 'up', amber: 0.002,
+    definition: 'Minutes the telehealth platform is available for video visits ÷ total minutes (unplanned downtime only).', source: MON, owner: 'Clinical Apps Lead', scope: 'enterprise', page: 'clinical',
+    compute: (ds, c) => systemAvailability(ds, c.mis, 5),
   },
   {
     id: 'clin_planned', code: 'CS-04', name: 'Planned clinical downtime', short: 'Planned downtime', area: 'Clinical Systems', unit: 'hrs', target: null, better: 'none',

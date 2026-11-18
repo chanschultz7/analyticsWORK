@@ -57,6 +57,7 @@ export function Clinical() {
         { id: 'ehr_avail', label: 'EHR · availability', sub: () => <span className="muted">{num(ehr.unplanned)} min unplanned · {ehr.tickets} tickets</span> },
         { id: 'clin_below', label: 'Clinical systems below target', sub: () => <span className="muted ellipsis">{below.length ? below.map((b) => b.name.replace(' (production)', '')).join(', ') : 'All systems at target'}</span> },
         { id: 'clin_avail', label: 'Other P1 clinical systems' },
+        { id: 'telehealth', label: 'Telehealth platform' },
         { id: 'clin_planned', label: 'Planned downtime', sub: () => <span className="muted">{fmt(planned, 'count', 1)} hrs in {windows} windows · downtime procedures used: {anyDowntimeProc ? 'Yes' : 'No'}</span> },
         { id: 'interface_errors', label: 'Interfaces · errors and delays', sub: () => <span className="muted">{num(errs)} errors · {delays} delays · most: {worstIf?.interfaceErrors ? ds.systems[worstIf.sys].name : '–'}</span> },
       ]} />

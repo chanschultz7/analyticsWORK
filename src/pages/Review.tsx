@@ -13,7 +13,7 @@ import { CanvasHeader } from '../ui/Shell';
 import { Visual } from '../ui/Visual';
 
 /** Headline KPIs for leadership: one or two per area. */
-const HEADLINE = ['svc_levels_met', 'uptime_p1', 'ehr_avail', 'mi_p1p2', 'mi_downtime', 'sla_all', 'tickets_resolved', 'csat', 'fcr', 'over7',
+const HEADLINE = ['svc_levels_met', 'uptime_p1', 'ehr_avail', 'telehealth', 'mi_p1p2', 'mi_downtime', 'sla_all', 'tickets_resolved', 'csat', 'fcr', 'over7',
   'network', 'unsched_down', 'backup', 'crit7', 'phish', 'vuln_crit', 'phi', 'chg_success', 'spend_vs_budget', 'it_spend', 'cost_ticket', 'credits', 'downtime_cost'];
 
 export function Review() {

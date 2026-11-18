@@ -119,7 +119,7 @@ function SiteTable() {
     { key: 'share', label: 'Share', value: (r) => r.share, render: (r) => pct(r.share, 0) },
     { key: 'closed', label: 'Closed', value: (r) => r.closed, render: (r) => num(r.closed) },
     { key: 'backlog', label: 'Open backlog', value: (r) => r.backlog, render: (r) => num(r.backlog) },
-    { key: 'over7', label: 'Over 7 days', value: (r) => r.over7, render: (r) => num(r.over7), status: (r) => (r.over7 > 60 * ds.sites[r.key].weight + 5 ? 'off' : 'ok') },
+    { key: 'over7', label: 'Over 7 days', value: (r) => r.over7, render: (r) => num(r.over7), status: (r) => (r.over7 > 32 * ds.sites[r.key].weight + 3 ? 'off' : 'ok') },
     { key: 'sla', label: 'Within SLA', value: (r) => r.sla, render: (r) => pct(r.sla), status: (r) => (r.sla === null ? 'none' : r.sla >= 0.95 ? 'ok' : r.sla >= 0.93 ? 'watch' : 'off') },
     { key: 'csat', label: 'Satisfaction', value: (r) => r.csat, render: (r) => fmt(r.csat, 'score'), status: (r) => (r.csat === null ? 'none' : r.csat >= 4.5 ? 'ok' : r.csat >= 4.3 ? 'watch' : 'off') },
   ];
