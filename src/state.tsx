@@ -9,7 +9,7 @@ import type { Dataset, Pri } from './data/model';
 import type { Area, Ctx } from './metrics';
 import { comparePeriod, makePeriod, type Period, type PeriodKind } from './periods';
 
-export type PageId = 'executive' | 'review' | 'financial' | 'scorecard' | 'service-desk' | 'clinical' | 'infrastructure' | 'incidents' | 'security' | 'sites' | 'projects' | 'reference';
+export type PageId = 'elt' | 'executive' | 'review' | 'financial' | 'scorecard' | 'service-desk' | 'clinical' | 'infrastructure' | 'incidents' | 'security' | 'sites' | 'projects' | 'reference';
 export type Compare = 'prior' | 'py';
 export type FilterField = 'region' | 'ft' | 'sites' | 'pt' | 'sl' | 'pri' | 'cat';
 export const FILTER_FIELDS: FilterField[] = ['region', 'ft', 'sites', 'pt', 'sl', 'pri', 'cat'];
@@ -20,7 +20,7 @@ interface Route {
   areas: Area[]; tab?: string; site?: number;
 }
 
-const PAGES: PageId[] = ['executive', 'review', 'financial', 'scorecard', 'service-desk', 'clinical', 'infrastructure', 'incidents', 'security', 'sites', 'projects', 'reference'];
+const PAGES: PageId[] = ['elt', 'executive', 'review', 'financial', 'scorecard', 'service-desk', 'clinical', 'infrastructure', 'incidents', 'security', 'sites', 'projects', 'reference'];
 
 function parse(hash: string, ds: Dataset): Route {
   const [path, q = ''] = hash.replace(/^#\/?/, '').split('?');
@@ -28,7 +28,7 @@ function parse(hash: string, ds: Dataset): Route {
   const list = (k: string) => (p.get(k) ? p.get(k)!.split(',').filter(Boolean) : []);
   const mi = Number(p.get('m'));
   return {
-    page: (PAGES as string[]).includes(path) ? (path as PageId) : 'executive',
+    page: (PAGES as string[]).includes(path) ? (path as PageId) : 'elt',
     mi: Number.isInteger(mi) && p.has('m') && mi >= 0 && mi <= ds.currentMi ? mi : ds.currentMi,
     pk: (['month', 'quarter', 'ytd', 'year', 'r12'] as const).find((k) => k === p.get('pk')) ?? 'month',
     compare: p.get('cmp') === 'py' ? 'py' : 'prior',

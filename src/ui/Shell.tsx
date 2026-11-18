@@ -12,18 +12,19 @@ import { Icon } from './icons';
 export interface PageMeta { id: PageId; group: string; label: string; title: string; question: string; slides: string; filters: FilterField[] }
 
 export const PAGES: PageMeta[] = [
-  { id: 'executive', group: 'Summary', label: 'Executive', title: 'Executive Summary', question: 'How did IT run this month, and what do leaders need to know or decide?', slides: 'MOR slide 3', filters: [] },
+  { id: 'elt', group: 'Summary', label: 'ELT Summary', title: 'ELT Summary', question: 'How are we doing?', slides: 'ELT view', filters: [] },
+  { id: 'executive', group: 'Summary', label: 'MOR Summary', title: 'Executive Summary', question: 'How did IT run this month, and what do leaders need to know or decide?', slides: 'MOR slide 3', filters: [] },
   { id: 'review', group: 'Summary', label: 'Qtr & Year', title: 'Quarter and Year Review', question: 'How did each quarter and month of the year perform against target, and how does the year compare with last year?', slides: 'Board / ELT view', filters: [] },
   { id: 'financial', group: 'Summary', label: 'Financial', title: 'Financial and Value Summary', question: 'What does IT cost, are we on budget, and what did service misses and downtime cost us?', slides: 'CFO view', filters: [] },
   { id: 'scorecard', group: 'Summary', label: 'Scorecard', title: 'Service Scorecard vs Targets', question: 'Which service levels met target this month, and which are trending the wrong way?', slides: 'MOR slides 4-5', filters: [] },
   { id: 'service-desk', group: 'Analytics', label: 'Service Desk', title: 'Service Desk: Demand, Speed and Experience', question: 'Is demand under control, and are users getting fast, good service?', slides: 'MOR slides 6-7', filters: ['pri', 'cat'] },
   { id: 'clinical', group: 'Analytics', label: 'Clinical Apps', title: 'Clinical Applications: EHR and Clinical System Health', question: 'Were the EHR and clinical systems available when clinicians needed them?', slides: 'MOR slide 8', filters: [] },
   { id: 'infrastructure', group: 'Analytics', label: 'Infrastructure', title: 'Infrastructure Health: Stability, Protection and Capacity', question: 'Is the infrastructure stable, protected and sized for what is coming?', slides: 'MOR slide 9', filters: [] },
-  { id: 'incidents', group: 'Analytics', label: 'Major Incidents', title: 'Major Incidents: P1 and P2 Events and Fixes', question: 'What broke, who was affected, and are the fixes on track?', slides: 'MOR slide 10 · A5', filters: [] },
+  { id: 'incidents', group: 'Analytics', label: 'Incidents', title: 'Major Incidents: P1 and P2 Events and Fixes', question: 'What broke, who was affected, and are the fixes on track?', slides: 'MOR slide 10 · A5', filters: [] },
   { id: 'security', group: 'Analytics', label: 'Security', title: 'Security and Compliance: Risk Posture', question: 'How exposed are we, and is protection coverage where it needs to be?', slides: 'MOR slide 11', filters: [] },
   { id: 'sites', group: 'Analytics', label: 'Sites', title: 'Site IT Tear Sheet', question: 'How is IT performing at each site compared with the rest of the system?', slides: 'MOR appendix tear sheet', filters: [] },
   { id: 'projects', group: 'Act', label: 'Projects & Actions', title: 'Projects, Actions and Decisions', question: 'Are projects on track, what are we doing next month, and what do we need decided?', slides: 'MOR slides 12-13', filters: [] },
-  { id: 'reference', group: 'Appendix', label: 'SLAs & Definitions', title: 'Appendix: Contract Service Levels, Definitions and Rules', question: 'What does each measure mean, what did the contract promise, and how is status set?', slides: 'MOR A1-A4', filters: [] },
+  { id: 'reference', group: 'Appendix', label: 'Definitions', title: 'Appendix: Contract Service Levels, Definitions and Rules', question: 'What does each measure mean, what did the contract promise, and how is status set?', slides: 'MOR A1-A4', filters: [] },
 ];
 export const PAGE_BY_ID = Object.fromEntries(PAGES.map((p) => [p.id, p])) as Record<PageId, PageMeta>;
 

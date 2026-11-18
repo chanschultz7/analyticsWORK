@@ -19,8 +19,11 @@ export function fmt(v: number | null | undefined, unit: Unit, digits?: number): 
 /** Signed difference in the metric's own unit (percentage points for percentages). */
 export function fmtDelta(d: number | null | undefined, unit: Unit, digits?: number): string {
   if (d === null || d === undefined || Number.isNaN(d)) return '–';
-  const sign = d > 0 ? '+' : d < 0 ? '−' : '±';
   const a = Math.abs(d);
+  // A change that rounds to zero at the shown precision reads as no change (no "−0.00").
+  const shown = unit === 'pct' ? a * 100 : a;
+  const dp = digits ?? (unit === 'pct' ? 1 : unit === 'score' ? 2 : unit === 'hrs' || unit === 'days' ? 1 : 0);
+  const sign = shown < 0.5 * 10 ** -dp ? '±' : d > 0 ? '+' : '−';
   if (unit === 'pct') return `${sign}${nf(digits ?? 1).format(a * 100)} pts`;
   return `${sign}${fmt(a, unit, digits)}`;
 }

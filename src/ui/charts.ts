@@ -104,3 +104,67 @@ export function stackedOption(o: { labels: string[]; series: Series[]; fmt: (v: 
     xAxis: o.horizontal ? v : c, yAxis: o.horizontal ? c : v, series,
   } as EChartsOption;
 }
+
+// ---------------------------------------------------------------- ELT Summary charts
+
+/** Round to a step sized to the data range (not the magnitude), so 99.6%-100% stays readable. */
+const stepOf = (range: number) => 10 ** Math.floor(Math.log10(range || 1) - 0.5);
+const niceFloor = (v: number, range: number) => Math.floor(v / stepOf(range)) * stepOf(range);
+const niceCeil = (v: number, range: number) => Math.ceil(v / stepOf(range)) * stepOf(range);
+
+/** ELT trend card: actual line, dashed target and a faint off-target range (as in RCM analytics). */
+export function eltTrendOption(o: { labels: string[]; values: (number | null)[]; target: number | null; fmt: (v: number) => string; direction: 'up' | 'down' | 'none'; bars?: boolean }): EChartsOption {
+  const vals = o.values.filter((v): v is number => v != null);
+  const lo = Math.min(...vals, o.target ?? Infinity);
+  const hi = Math.max(...vals, o.target ?? -Infinity);
+  const pad = (hi - lo) * 0.18 || Math.abs(hi) * 0.05 || 1;
+  const range = hi - lo + 2 * pad;
+  const min = o.bars ? 0 : niceFloor(lo - pad, range);
+  // Availability-style percentages cannot exceed 100%.
+  const max = hi <= 1 && lo >= 0 && o.direction === 'up' && hi > 0.9 ? Math.min(1, niceCeil(hi + pad, range)) : niceCeil(hi + pad, range);
+  const last = o.values.length - 1;
+  const missZone = o.target === null || o.direction === 'none' ? undefined : {
+    silent: true, itemStyle: { color: 'rgba(187,51,40,0.06)' },
+    data: [[{ yAxis: o.direction === 'down' ? o.target : min }, { yAxis: o.direction === 'down' ? max : o.target }]],
+  };
+  return {
+    ...base,
+    grid: { left: 4, right: 14, top: 12, bottom: 4, containLabel: true },
+    tooltip: { ...tooltip, trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: INK.axis } }, valueFormatter: (v) => (v == null ? '–' : o.fmt(v as number)) },
+    xAxis: catAxis(o.labels, { boundaryGap: !!o.bars, axisLabel: { color: INK.muted, fontSize: 10, interval: (i: number) => i === 0 || i === last || i === Math.floor(last / 2) } }),
+    yAxis: { ...valueAxis(o.fmt, { min, max, splitNumber: 3, minInterval: o.bars ? 1 : undefined }), splitLine: { lineStyle: { color: '#f0f2f5' } } },
+    series: [{
+      name: 'Actual', type: o.bars ? 'bar' : 'line', data: o.values, barMaxWidth: 14, smooth: false, showSymbol: false, symbol: 'circle', symbolSize: 8,
+      lineStyle: { width: 2, color: SERIES[0] }, itemStyle: { color: SERIES[0], borderColor: o.bars ? undefined : '#fff', borderWidth: o.bars ? 0 : 2 },
+      areaStyle: o.bars ? undefined : { color: 'rgba(42,120,214,0.06)' },
+      markLine: o.target === null ? undefined : { silent: true, symbol: 'none', lineStyle: { color: INK.secondary, type: 'dashed', width: 1 }, label: { show: false }, data: [{ yAxis: o.target }] },
+      markArea: missZone,
+    }],
+  } as EChartsOption;
+}
+
+export interface UnitAxis { name: string; fmt: (v: number) => string }
+export interface TrendLine { name: string; data: (number | null)[]; color: string; axis: 0 | 1; target?: (number | null)[] }
+
+/** ELT selected-metric trend: one line per metric in a fixed color, dashed targets, two units at most. */
+export function multiTrendOption(o: { labels: string[]; lines: TrendLine[]; axes: UnitAxis[]; showTargets: boolean }): EChartsOption {
+  const fmtOf = (axis: number) => o.axes[axis]?.fmt ?? String;
+  const series = o.lines.flatMap((l) => [
+    { name: l.name, type: 'line' as const, yAxisIndex: l.axis, data: l.data, showSymbol: o.labels.length <= 14, symbol: 'circle', symbolSize: 7,
+      lineStyle: { width: 2, color: l.color }, itemStyle: { color: l.color, borderColor: '#fff', borderWidth: 2 },
+      tooltip: { valueFormatter: (v: unknown) => (v == null ? '–' : fmtOf(l.axis)(v as number)) } },
+    ...(o.showTargets && l.target?.some((t) => t !== null) ? [{
+      name: `${l.name} target`, type: 'line' as const, yAxisIndex: l.axis, data: l.target, showSymbol: false, silent: true,
+      lineStyle: { width: 1, type: 'dashed' as const, color: l.color, opacity: 0.7 }, itemStyle: { color: l.color },
+      tooltip: { valueFormatter: (v: unknown) => (v == null ? '–' : fmtOf(l.axis)(v as number)) } }] : []),
+  ]);
+  return {
+    ...base,
+    grid: { left: 8, right: 8, top: 52, bottom: 4, containLabel: true },
+    legend: { top: 0, left: 0, icon: 'roundRect', itemWidth: 12, itemHeight: 3, textStyle: { color: INK.secondary, fontSize: 11 }, data: o.lines.map((l) => l.name) },
+    tooltip: { ...tooltip, trigger: 'axis', axisPointer: { type: 'line', lineStyle: { color: INK.axis } } },
+    xAxis: catAxis(o.labels, { boundaryGap: false }),
+    yAxis: o.axes.map((a, i) => valueAxis(a.fmt, { name: a.name, nameTextStyle: { color: INK.muted, fontSize: 10, align: i === 0 ? 'left' : 'right' }, scale: true, position: i === 0 ? 'left' : 'right', ...(i === 1 ? { splitLine: { show: false } } : {}) })),
+    series,
+  } as EChartsOption;
+}

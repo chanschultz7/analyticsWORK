@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { generateDataset } from './data/generate';
 import { Clinical } from './pages/Clinical';
+import { EltSummary } from './pages/EltSummary';
 import { Executive } from './pages/Executive';
 import { Financial } from './pages/Financial';
 import { Review } from './pages/Review';
@@ -16,7 +17,7 @@ import { AppProvider, useApp, type PageId } from './state';
 import { FilterPane, Header, NavTabs, StatusBar, Toasts } from './ui/Shell';
 
 const VIEWS: Record<PageId, () => JSX.Element> = {
-  executive: Executive, review: Review, financial: Financial, scorecard: Scorecard, 'service-desk': ServiceDesk, clinical: Clinical, infrastructure: Infrastructure,
+  elt: EltSummary, executive: Executive, review: Review, financial: Financial, scorecard: Scorecard, 'service-desk': ServiceDesk, clinical: Clinical, infrastructure: Infrastructure,
   incidents: Incidents, security: Security, sites: Sites, projects: Projects, reference: Reference,
 };
 
@@ -28,7 +29,7 @@ export default function App() {
 function Workspace() {
   const { route } = useApp();
   const View = VIEWS[route.page];
-  const exec = route.page === 'executive';
+  const exec = route.page === 'executive' || route.page === 'elt';
   return (
     <div className={`app ${exec ? 'app-exec' : ''}`}>
       <Header />

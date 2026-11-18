@@ -38,7 +38,8 @@ with "GitHub Actions" as the source in the repository settings).
 
 | Tab | MOR slides | What it shows |
 |---|---|---|
-| Executive | 3 (and agenda, 2) | Five headline KPIs (critical system uptime, service levels met, tickets resolved, P1+P2 incidents, open critical issues), this month in brief, key points, decisions required, since last review, measures off target, 12-month trends |
+| ELT Summary | ELT view (landing page) | Condensed executive view like the RCM ELT Summary, no prose: 5 KPI cards (actual, target, variance, 3-month change, sparkline), 3 trend charts with target and off-target range, Performance vs. Target for a 21-KPI IT framework (Service Delivery, Availability and Resilience, Risk and Security, Financial) as a summary or a period table (monthly, quarterly, yearly; CSV export), and Selected Metric Trends for the checked KPIs |
+| MOR Summary | 3 (and agenda, 2) | Five headline KPIs (critical system uptime, service levels met, tickets resolved, P1+P2 incidents, open critical issues), this month in brief, key points, decisions required, since last review, measures off target, 12-month trends |
 | Qtr & Year | Board / ELT view | Every KPI by quarter (Q1-Q4), year to date vs the same months last year, and a month-by-month heat table for the selected year |
 | Financial | CFO view | Managed IT spend vs budget, total IT cost, cost per ticket / user / device, project spend vs plan, service credits, estimated cost of clinical downtime, cumulative spend and run-rate forecast, project budgets |
 | Scorecard | 4-5 | All 73 KPIs (operational, executive and financial) with target, with target, prior, current, vs target, status, MoM and 3-month trend, months met (12), 13-month sparkline; filter by area or off-target only |
