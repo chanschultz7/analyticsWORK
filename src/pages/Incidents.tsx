@@ -6,7 +6,7 @@ import { num } from '../format';
 import { useApp } from '../state';
 import { Chart } from '../ui/Chart';
 import { barOption, PRI_COLORS, stackedOption } from '../ui/charts';
-import { Commentary, KpiCard, RagCell } from '../ui/common';
+import { Band, Commentary, KpiCard, RagCell } from '../ui/common';
 import { Grid, gridExport, type Col } from '../ui/Grid';
 import { CanvasHeader } from '../ui/Shell';
 import { Visual } from '../ui/Visual';
@@ -53,6 +53,7 @@ export function Incidents() {
   return (
     <div className="page">
       <CanvasHeader />
+      <Band type="kpi" note="How many major incidents, how much clinical impact, and are fixes on track? (MOR slide 10)" />
       <div className="kpi-strip" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' }}>
         <KpiCard id="mi_p1p2" label="Count · P1 and P2 incidents" sub={<span className="muted">{month.filter((i) => i.sev === 'P1').length} P1 · {month.filter((i) => i.sev === 'P2').length} P2 · {cmpPeriod.short} {prior.filter((i) => i.sev === 'P1').length} P1 · {prior.filter((i) => i.sev === 'P2').length} P2</span>} />
         <KpiCard id="mi_downtime" label="Impact · clinical downtime" sub={<span className="muted ellipsis">{sitesHit} sites · longest: {longest ? `${longest.system}, ${longest.durationHrs.toFixed(1)} hrs` : '–'}</span>} />
@@ -63,12 +64,23 @@ export function Incidents() {
           <div className="kpi-row"><span className="muted">{closedNow} closed in period · {downtime.toFixed(1)} hrs clinical downtime</span></div>
         </div>
       </div>
-      <div className="row cols-3">
+
+      <Band type="trend" />
+      <div className="row cols-2">
         <Visual title="P1 and P2 incidents, monthly" metricId="mi_p1p2" subtitle="Target ≤ 2 per month · click a column to set the month"
           table={{ columns: ['Month', 'P1', 'P2'], rows: months.map((m) => [m.label, ds.incidents.filter((i) => i.mi === m.mi && i.sev === 'P1' && siteOk(i)).length, ds.incidents.filter((i) => i.mi === m.mi && i.sev === 'P2' && siteOk(i)).length]) }}>
           <Chart height={220} ariaLabel="Incidents by month" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}
             option={stackedOption({ labels: months.map((m) => m.short), fmt: (v) => num(v), series: (['P1', 'P2'] as const).map((p) => ({ name: p, color: PRI_COLORS[p], data: months.map((m) => ds.incidents.filter((i) => i.mi === m.mi && i.sev === p && siteOk(i)).length) })) })} />
         </Visual>
+        <Visual title="Clinical downtime from major incidents, monthly" metricId="mi_downtime" subtitle="Hours on downtime procedures · click a column to set the month"
+          table={{ columns: ['Month', 'Clinical downtime (hrs)'], rows: months.map((m) => [m.label, ds.incidents.filter((i) => i.mi === m.mi && siteOk(i)).reduce((a, i) => a + i.clinicalDowntimeHrs, 0)]) }}>
+          <Chart height={220} ariaLabel="Clinical downtime by month" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}
+            option={barOption({ labels: months.map((m) => m.short), fmt: (v) => `${v.toFixed(1)} h`, series: [{ name: 'Clinical downtime', data: months.map((m) => Math.round(ds.incidents.filter((i) => i.mi === m.mi && siteOk(i)).reduce((a, i) => a + i.clinicalDowntimeHrs, 0) * 10) / 10), color: '#bb3328' }] })} />
+        </Visual>
+      </div>
+
+      <Band type="where" note="Which systems and sites had major incidents (last 12 months)?" />
+      <div className="row cols-2">
         <Visual title="Incidents by system, last 12 months" subtitle="P1 + P2 count" table={{ columns: ['System', 'Incidents'], rows: bySys }}>
           <Chart height={220} ariaLabel="Incidents by system" option={barOption({ labels: bySys.map((x) => x[0]), horizontal: true, fmt: (v) => num(v), series: [{ name: 'Incidents', data: bySys.map((x) => x[1]) }] })} />
         </Visual>
@@ -77,6 +89,8 @@ export function Incidents() {
             option={barOption({ labels: bySite.map((x) => x.s.short), horizontal: true, fmt: (v) => num(v), selected: bySite.map((x, i) => (route.sites.includes(x.s.key) ? i : -1)).filter((i) => i >= 0), series: [{ name: 'Incidents', data: bySite.map((x) => x.n) }] })} />
         </Visual>
       </div>
+
+      <Band type="why" note="Root cause and resolution of each incident (A5 log) · click a row for the full record" />
       <Visual title={scope === 'month' ? `P1 and P2 incidents and problem records, ${period.label}` : scope === 'open' ? 'Major incident log (A5): this period plus open actions' : 'Major incident log, last 12 months'}
         subtitle="Click a row for the full record" table={gridExport(cols, g)}
         actions={(
@@ -103,7 +117,30 @@ export function Incidents() {
           </div>
         )}
       </Visual>
+
+      <Band type="act" note="Corrective actions to work: open and overdue preventive actions" />
+      <CorrectiveActions />
       <Commentary>{ds.commentary.incidents}</Commentary>
     </div>
+  );
+}
+
+/** Open and overdue preventive actions from P1/P2 incidents up to the end of the period. */
+function CorrectiveActions() {
+  const { ds, ctx } = useApp();
+  const rows = ds.incidents.filter((i) => i.mi <= ctx.mi && i.actionStatus !== 'Closed' && (!ctx.sites.length || i.sites.some((s) => ctx.sites.includes(s))));
+  type R = (typeof rows)[number];
+  const cols: Col<R>[] = [
+    { key: 'action', label: 'Preventive action', width: 260, wrap: true, value: (r) => r.action },
+    { key: 'inc', label: 'From incident', align: 'left', value: (r) => r.id, render: (r) => <span>{r.id} <span className="muted">· {r.system}</span></span> },
+    { key: 'owner', label: 'Owner', align: 'left', value: (r) => r.owner },
+    { key: 'due', label: 'Due', align: 'left', value: (r) => r.due },
+    { key: 'st', label: 'Status', align: 'left', value: (r) => (r.actionStatus === 'Overdue' ? 0 : 1), render: (r) => <RagCell rag={r.actionStatus === 'Overdue' ? 'R' : 'A'} text={r.actionStatus} />, exportText: (r) => r.actionStatus },
+  ];
+  const g = rows.map((r) => ({ id: r.id, data: r }));
+  return (
+    <Visual title="Corrective actions to work" subtitle={`${rows.length} open · ${rows.filter((r) => r.actionStatus === 'Overdue').length} overdue · overdue first`} table={gridExport(cols, g)}>
+      <Grid caption="Corrective actions" columns={cols} rows={g} dense defaultSort={{ key: 'st', dir: 'asc' }} />
+    </Visual>
   );
 }

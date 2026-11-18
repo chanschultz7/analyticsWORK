@@ -8,7 +8,7 @@ import { evaluate, priorShift, shiftCtx, ticketRows, type Ctx } from '../metrics
 import { scopeSites, useApp } from '../state';
 import { Chart } from '../ui/Chart';
 import { lineOption, PRI_COLORS, SERIES, stackedOption } from '../ui/charts';
-import { Commentary, KpiStrip, SectionHead } from '../ui/common';
+import { AreaActions, Band, Commentary, KpiStrip } from '../ui/common';
 import { Grid, gridExport, type Col } from '../ui/Grid';
 import { CanvasHeader } from '../ui/Shell';
 import { Visual } from '../ui/Visual';
@@ -19,10 +19,11 @@ const sum = <T,>(r: T[], f: (x: T) => number) => r.reduce((a, x) => a + f(x), 0)
 export function ServiceDesk() {
   const { ds, ctx } = useApp();
   const backlog = evaluate(ds, 'backlog_open', ctx);
+  const { go } = useApp();
   return (
     <div className="page">
       <CanvasHeader />
-      <SectionHead title="Demand and backlog" note="Slide 6: volume, throughput, backlog and the drivers behind them" />
+      <Band type="kpi" note="Are demand, backlog, speed and experience on target? (MOR slides 6 and 7)" />
       <KpiStrip ids={[
         { id: 'tickets_opened', label: 'Tickets opened', sub: () => <PriMix /> },
         { id: 'throughput', label: 'Throughput · resolved % of opened' },
@@ -30,31 +31,41 @@ export function ServiceDesk() {
         { id: 'over7', label: 'Backlog over 7 days', sub: () => <span className="muted">{pct(backlog.value ? (evaluate(ds, 'over7', ctx).value ?? 0) / backlog.value : null)} of open backlog</span> },
         { id: 'reopen', label: 'Reopened ticket rate' },
       ]} />
-      <div className="row cols-7-5">
+      <KpiStrip ids={['sla_all', 'sla_p2', 'fcr', 'asa', 'abandon', 'csat']} />
+
+      <Band type="trend" />
+      <div className="row cols-2">
         <VolumeTrend />
         <BacklogTrend />
       </div>
+      <SlaTrend />
+
+      <Band type="where" />
       <div className="row cols-3">
-        <BreakdownVisual id="tickets_opened" alt={['sla_all', 'over7', 'csat']} dim="sites" title="Tickets by site" height={230} />
+        <BreakdownVisual id="tickets_opened" alt={['sla_all', 'over7', 'csat']} dim="sites" title="Tickets by site" height={300} />
+        <BreakdownVisual id="tickets_opened" alt={['sla_all', 'over7', 'csat', 'fcr']} dim="region" title="Tickets by region" height={200} />
+        <BreakdownVisual id="tickets_opened" alt={['sla_all']} dim="pt" title="Tickets by patient type" subtitle="Care setting of the requesting department · click a bar to filter" height={200} />
+      </div>
+      <div className="row cols-5-7">
+        <BreakdownVisual id="tickets_opened" alt={['sla_all']} dim="sl" title="Tickets by service line" subtitle="Requesting department's service line · click a bar to filter" />
+        <SiteTable />
+      </div>
+
+      <Band type="why" />
+      <div className="row cols-2">
         <BreakdownVisual id="tickets_opened" dim="cat" title="Tickets by category" top={10} showCompare />
         <BreakdownVisual id="tickets_opened" alt={['sla_all']} dim="pri" title="Tickets by priority" height={230} />
       </div>
-      <div className="row cols-3">
-        <BreakdownVisual id="tickets_opened" alt={['sla_all']} dim="sl" title="Tickets by service line" subtitle="Requesting department's service line · click a bar to filter" />
-        <BreakdownVisual id="tickets_opened" alt={['sla_all']} dim="pt" title="Tickets by patient type" subtitle="Care setting of the requesting department · click a bar to filter" height={200} />
-        <BreakdownVisual id="tickets_opened" alt={['sla_all', 'over7', 'csat', 'fcr']} dim="region" title="Tickets by region" height={200} />
-      </div>
-      <SiteTable />
-      <Commentary>{ds.commentary.serviceDesk}</Commentary>
-
-      <SectionHead title="Speed and user experience" note="Slide 7: SLA by priority, first-call resolution, phone and satisfaction" />
-      <KpiStrip ids={['sla_all', 'sla_p2', 'fcr', 'asa', 'abandon', 'csat']} />
-      <div className="row cols-7-5">
-        <PriorityTable />
-        <SlaTrend />
-      </div>
+      <PriorityTable />
       <RecurringCategories />
       <DecompositionTree id="tickets_opened" dims={['region', 'sites', 'pt', 'sl', 'cat', 'pri']} title="Ticket decomposition" />
+
+      <Band type="act" note="Fixes in flight and next month's service desk actions"
+        actions={<button type="button" className="btn btn-primary btn-sm" onClick={() => go('projects')}>Projects, actions and decisions ›</button>} />
+      <div className="row cols-2">
+        <Commentary>{ds.commentary.serviceDesk}</Commentary>
+        <AreaActions areas={['Service Desk']} />
+      </div>
     </div>
   );
 }

@@ -5,11 +5,11 @@ import { evaluate, type MetricValue } from '../metrics';
 import { useApp } from '../state';
 import { Chart } from '../ui/Chart';
 import { lineOption, SERIES, stackedOption } from '../ui/charts';
-import { Commentary, fm, InfoIcon, KpiStrip, Sparkline, StatusMark } from '../ui/common';
+import { AreaActions, Band, Commentary, fm, InfoIcon, KpiStrip, Sparkline, StatusMark } from '../ui/common';
 import { Grid, gridExport, type Col } from '../ui/Grid';
 import { CanvasHeader } from '../ui/Shell';
 import { Visual } from '../ui/Visual';
-import { TrendVisual } from '../ui/widgets';
+import { BreakdownVisual, TrendVisual } from '../ui/widgets';
 
 const PROTECTION: { id: string; check: string }[] = [
   { id: 'endpoint', check: 'In-scope computers and servers reporting in' },
@@ -27,7 +27,7 @@ const PROTECTION: { id: string; check: string }[] = [
 ];
 
 export function Security() {
-  const { ds, ctx, set, period, cmpPeriod } = useApp();
+  const { ds, ctx, set, period, cmpPeriod, go } = useApp();
   const ec = { ...ctx, sites: [] };
   const mi = ctx.mi;
   // Period view: counts are totals over the period; open findings, coverage and exceptions are month-end.
@@ -66,6 +66,7 @@ export function Security() {
   return (
     <div className="page">
       <CanvasHeader />
+      <Band type="kpi" note="Is protection coverage at target, and how exposed are we? (MOR slide 11)" />
       <KpiStrip ids={[
         { id: 'sec_incidents', label: 'Events · security incidents', sub: () => <span className="muted">{s.incLow} low · {s.incMed} medium · {s.incHigh} high · {s.incOpen} open</span> },
         { id: 'vuln_crit', label: 'Exposure · critical findings', sub: () => <span className="muted">C {s.vulnC} · H {s.vulnH} · M {s.vulnM} · L {num(s.vulnL)}</span> },
@@ -74,22 +75,17 @@ export function Security() {
         { id: 'phish', label: 'Signals · phishing click rate', sub: () => <span className="muted">{num(s.phishClicks)} clicks of {num(s.phishDelivered)} delivered</span> },
         { id: 'failed_logins', label: 'Signals · failed logins', sub: () => <span className="muted">{num(s.lockouts)} lockouts</span> },
       ]} />
-      <div className="row cols-5-7">
-        <Visual title="Vulnerability findings by severity and age" metricId="vuln_crit" subtitle={`Open findings at month end · ${oldest} critical/high older than 90 days · ${s.patchExceptions} devices with logged patching exceptions`}
-          table={{ columns: ['Severity', ...AGE], rows: SEV.map((sv, i) => [sv, ...s.vulnAge[i]]) }}>
-          <Chart height={240} ariaLabel="Vulnerabilities by severity and age"
-            option={stackedOption({ labels: SEV, horizontal: true, fmt: (v) => num(v), series: AGE.map((a, k) => ({ name: a, color: ['#86b6ef', '#3987e5', '#184f95', '#0d366b'][k], data: SEV.map((_, i) => s.vulnAge[i][k]) })) })} />
-        </Visual>
-        <Visual title="Critical and high findings, monthly" subtitle="Open at month end · click a month to set the period"
-          table={{ columns: ['Month', 'Critical', 'High'], rows: months.map((m) => [m.label, ds.security[m.mi].vulnC, ds.security[m.mi].vulnH]) }}>
-          <Chart height={240} ariaLabel="Critical and high findings trend" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}
-            option={lineOption({ labels: months.map((m) => m.short), fmt: (v) => num(v), selectedIndex: months.length - 1, min: 0, series: [{ name: 'High', data: months.map((m) => ds.security[m.mi].vulnH), color: SERIES[1] }, { name: 'Critical', data: months.map((m) => ds.security[m.mi].vulnC), color: '#bb3328' }] })} />
-        </Visual>
-      </div>
       <Visual title="Protection and security metrics" subtitle={`${period.label} · lowest coverage: ${lowest(rows)} · targets are Convene defaults, confirm per contract`} table={gridExport(cols, g)}>
         <Grid caption="Protection and security metrics" columns={cols} rows={g} dense />
       </Visual>
-      <div className="row cols-2">
+
+      <Band type="trend" />
+      <div className="row cols-3">
+        <Visual title="Critical and high findings, monthly" subtitle="Open at month end · click a month to set the period"
+          table={{ columns: ['Month', 'Critical', 'High'], rows: months.map((m) => [m.label, ds.security[m.mi].vulnC, ds.security[m.mi].vulnH]) }}>
+          <Chart height={200} ariaLabel="Critical and high findings trend" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}
+            option={lineOption({ labels: months.map((m) => m.short), fmt: (v) => num(v), selectedIndex: months.length - 1, min: 0, series: [{ name: 'High', data: months.map((m) => ds.security[m.mi].vulnH), color: SERIES[1] }, { name: 'Critical', data: months.map((m) => ds.security[m.mi].vulnC), color: '#bb3328' }] })} />
+        </Visual>
         <TrendVisual id="phish" title="Phishing simulation click rate, monthly" height={200} ctxOverride={{ sites: [] }} />
         <Visual title="Failed logins and lockouts, monthly" metricId="failed_logins" subtitle="Spikes are flagged when more than 30% above the prior 3-month average"
           table={{ columns: ['Month', 'Failed logins', 'Lockouts'], rows: months.map((m) => [m.label, ds.security[m.mi].failedLogins, ds.security[m.mi].lockouts]) }}>
@@ -97,7 +93,28 @@ export function Security() {
             option={lineOption({ labels: months.map((m) => m.short), fmt: (v) => num(v), selectedIndex: months.length - 1, min: 0, series: [{ name: 'Failed logins', data: months.map((m) => ds.security[m.mi].failedLogins), color: SERIES[0] }, { name: 'Lockouts ×10', data: months.map((m) => ds.security[m.mi].lockouts * 10), color: SERIES[1] }] })} />
         </Visual>
       </div>
-      <Commentary>{ds.commentary.security} Training completion is {pct(s.training, 0)} against a 95% target.</Commentary>
+
+      <Band type="where" note="Which sites and facility types lag on patching?" />
+      <div className="row cols-2">
+        <BreakdownVisual id="crit7" alt={['patch30']} dim="sites" title="Critical patches ≤ 7 days by site" statusColors showCompare={false} height={300} />
+        <BreakdownVisual id="crit7" alt={['patch30']} dim="ft" title="Critical patches ≤ 7 days by facility type" statusColors showCompare={false} height={200} />
+      </div>
+
+      <Band type="why" note="What drives exposure: open findings by severity and age, and devices that cannot be patched" />
+      <div className="row cols-5-7">
+        <Visual title="Vulnerability findings by severity and age" metricId="vuln_crit" subtitle={`Open findings at month end · ${oldest} critical/high older than 90 days · ${s.patchExceptions} devices with logged patching exceptions`}
+          table={{ columns: ['Severity', ...AGE], rows: SEV.map((sv, i) => [sv, ...s.vulnAge[i]]) }}>
+          <Chart height={240} ariaLabel="Vulnerabilities by severity and age"
+            option={stackedOption({ labels: SEV, horizontal: true, fmt: (v) => num(v), series: AGE.map((a, k) => ({ name: a, color: ['#86b6ef', '#3987e5', '#184f95', '#0d366b'][k], data: SEV.map((_, i) => s.vulnAge[i][k]) })) })} />
+        </Visual>
+        <BreakdownVisual id="crit7" alt={['patch30']} dim="region" title="Critical patches ≤ 7 days by region" statusColors showCompare={false} height={240} />
+      </div>
+
+      <Band type="act" note="Security work for next month" actions={<button type="button" className="btn btn-primary btn-sm" onClick={() => go('projects')}>Projects, actions and decisions ›</button>} />
+      <div className="row cols-2">
+        <Commentary>{ds.commentary.security} Training completion is {pct(s.training, 0)} against a 95% target.</Commentary>
+        <AreaActions areas={['Security']} />
+      </div>
     </div>
   );
 }

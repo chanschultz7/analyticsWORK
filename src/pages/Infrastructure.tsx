@@ -6,7 +6,7 @@ import { evaluate, M, type MetricValue } from '../metrics';
 import { useApp } from '../state';
 import { Chart } from '../ui/Chart';
 import { barOption, SERIES, STATUS_COLOR, stackedOption } from '../ui/charts';
-import { Commentary, fm, InfoIcon, KpiStrip, RagCell, Sparkline, StatusMark, TrendTag } from '../ui/common';
+import { AreaActions, Band, Commentary, fm, InfoIcon, KpiStrip, RagCell, Sparkline, StatusMark, TrendTag } from '../ui/common';
 import { Grid, gridExport, type Col } from '../ui/Grid';
 import { CanvasHeader } from '../ui/Shell';
 import { Visual } from '../ui/Visual';
@@ -15,7 +15,7 @@ import { BreakdownVisual } from '../ui/widgets';
 const TABLE_IDS = ['network', 'wan', 'server', 'email', 'uptime_p1', 'uptime_gen', 'sched_down', 'unsched_down', 'backup', 'patch30', 'crit7', 'chg_total', 'chg_success', 'chg_emerg', 'storage', 'bandwidth', 'hostmem', 'certs60'];
 
 export function Infrastructure() {
-  const { ds, ctx, set, period, cmpPeriod } = useApp();
+  const { ds, ctx, set, period, cmpPeriod, go } = useApp();
   const mi = ctx.mi;
   // Period totals (counts, hours) and peaks (capacity) across the months in the period.
   const xs = ctx.mis.map((m) => ds.infra[m]);
@@ -46,6 +46,7 @@ export function Infrastructure() {
   return (
     <div className="page">
       <CanvasHeader />
+      <Band type="kpi" note="Is the infrastructure stable, protected and sized right? (MOR slide 9)" />
       <KpiStrip ids={[
         { id: 'uptime_p1', label: 'Systems · uptime, P1 tier', sub: (v) => <span className="muted">General tier {fm('uptime_gen')(evaluate(ds, 'uptime_gen', ctx).value)} · prior {fm('uptime_p1')(v.prior)}</span> },
         { id: 'unsched_down', label: 'Downtime · unscheduled', sub: () => <span className="muted">Scheduled {x.schedHrs.toFixed(1)} hrs (does not count vs target)</span> },
@@ -57,19 +58,29 @@ export function Infrastructure() {
       <Visual title="Infrastructure KPIs" subtitle={`${period.label} · green meets target; amber within tolerance; red misses target · all targets and thresholds: Convene default, confirm per contract`} table={gridExport(cols, g)}>
         <Grid caption="Infrastructure KPIs" columns={cols} rows={g} groups dense onRowClick={() => undefined} />
       </Visual>
-      <div className="row cols-3">
+
+      <Band type="trend" />
+      <div className="row cols-2">
         <Visual title="Downtime, scheduled vs unscheduled" metricId="unsched_down" subtitle="Hours per month · only unscheduled counts against target"
           table={{ columns: ['Month', 'Scheduled', 'Unscheduled'], rows: months.map((m) => [m.label, ds.infra[m.mi].schedHrs, ds.infra[m.mi].unschedHrs]) }}>
           <Chart height={220} ariaLabel="Downtime by type" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}
             option={stackedOption({ labels: months.map((m) => m.short), fmt: (v) => `${v.toFixed(1)} h`, series: [{ name: 'Scheduled', data: months.map((m) => ds.infra[m.mi].schedHrs), color: '#a9b0bb' }, { name: 'Unscheduled', data: months.map((m) => ds.infra[m.mi].unschedHrs), color: STATUS_COLOR.off }] })} />
         </Visual>
-        <BreakdownVisual id="network" alt={['patch30', 'crit7']} dim="sites" title="Network availability by site" subtitle="Click a bar to filter · use Region or Facility type in the pane to compare groups" statusColors showCompare={false} height={220} />
         <Visual title="Changes implemented by type" metricId="chg_total" subtitle="Standard / normal / emergency · failed changes caused an incident"
           table={{ columns: ['Month', 'Standard', 'Normal', 'Emergency', 'Failed'], rows: months.map((m) => { const i = ds.infra[m.mi]; return [m.label, i.chgStd, i.chgNormal, i.chgEmerg, i.chgFailed]; }) }}>
           <Chart height={220} ariaLabel="Changes by type" onClick={(i) => months[i] && set({ mi: months[i].mi, pk: 'month' })}
             option={stackedOption({ labels: months.map((m) => m.short), fmt: (v) => num(v), series: [{ name: 'Standard', data: months.map((m) => ds.infra[m.mi].chgStd), color: SERIES[0] }, { name: 'Normal', data: months.map((m) => ds.infra[m.mi].chgNormal), color: '#86b6ef' }, { name: 'Emergency', data: months.map((m) => ds.infra[m.mi].chgEmerg), color: SERIES[1] }] })} />
         </Visual>
       </div>
+
+      <Band type="where" note="Which sites and regions have network, patching or backup gaps?" />
+      <div className="row cols-3">
+        <BreakdownVisual id="network" alt={['patch30', 'crit7']} dim="sites" title="Network availability by site" subtitle="Click a bar to filter" statusColors showCompare={false} height={300} />
+        <BreakdownVisual id="crit7" alt={['patch30']} dim="sites" title="Critical patches ≤ 7 days by site" statusColors showCompare={false} height={300} />
+        <BreakdownVisual id="network" alt={['patch30', 'crit7']} dim="ft" title="Network availability by facility type" subtitle="Critical access sites ride rural carrier circuits · click to filter" statusColors showCompare={false} height={200} />
+      </div>
+
+      <Band type="why" note="What drives risk: capacity, expiring certificates and end-of-life equipment" />
       <div className="row cols-3">
         <Visual title="Capacity watch, peak use" subtitle={`${period.label} peak · amber at 80%, red at 90% of capacity`} table={{ columns: ['Resource', 'Peak used'], rows: cap.map((c) => [c.name, pct(c.v, 0)]) }}>
           <Chart height={190} ariaLabel="Capacity peak use" option={barOption({ labels: cap.map((c) => c.name), horizontal: true, fmt: (v) => pct(v, 0), min: 0, max: 1, target: 0.8, series: [{ name: 'Peak', data: cap.map((c) => c.v) }], colorBy: (i) => (cap[i].v >= 0.9 ? STATUS_COLOR.off : cap[i].v >= 0.8 ? STATUS_COLOR.watch : SERIES[0]) })} />
@@ -77,7 +88,12 @@ export function Infrastructure() {
         <CertWatch />
         <EolWatch />
       </div>
-      <Commentary>{ds.commentary.infrastructure}</Commentary>
+
+      <Band type="act" note="Fixes in flight and next month's infrastructure actions" actions={<button type="button" className="btn btn-primary btn-sm" onClick={() => go('projects')}>Projects, actions and decisions ›</button>} />
+      <div className="row cols-2">
+        <Commentary>{ds.commentary.infrastructure}</Commentary>
+        <AreaActions areas={['Infrastructure']} />
+      </div>
     </div>
   );
 }

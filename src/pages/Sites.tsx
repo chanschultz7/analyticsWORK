@@ -6,7 +6,7 @@ import { evaluate, M, siteRows, type Ctx } from '../metrics';
 import { useApp } from '../state';
 import { Chart } from '../ui/Chart';
 import { COMPARE, lineOption, SERIES } from '../ui/charts';
-import { fm, StatusMark } from '../ui/common';
+import { Band, fm, StatusMark } from '../ui/common';
 import { Grid, gridExport, type Col } from '../ui/Grid';
 import { CanvasHeader } from '../ui/Shell';
 import { Visual } from '../ui/Visual';
@@ -45,6 +45,7 @@ export function Sites() {
         <span>{site.beds ? `${site.beds} beds` : 'Outpatient'}</span><span>{num(site.users)} users</span><span>{num(site.devices)} devices</span>
         <span>Share of tickets {pct(share, 0)}</span><span>{site.ehr}</span><span>Convene site lead: {site.lead}</span>
       </div>
+      <Band type="kpi" note="Is this site on target, compared with the prior period and all sites?" />
       <div className="kpi-strip" style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}>
         {TILES.map((t) => {
           const v = evaluate(ds, t.id, sc);
@@ -61,6 +62,7 @@ export function Sites() {
           );
         })}
       </div>
+      <Band type="trend" note="12 months, this site vs all sites" />
       <div className="row cols-4">
         {(['network', 'sla_all', 'over7', 'mi_p1p2'] as const).map((id) => {
           const v = evaluate(ds, id, sc, 12);
@@ -77,14 +79,17 @@ export function Sites() {
           );
         })}
       </div>
+      <Band type="where" note="How every site compares on the same measures" />
+      <SiteComparison onPick={(k) => set({ site: k })} current={site.key} />
+      <Band type="why" note="Other measures behind the numbers" />
       <div className="other-measures">
         <b>Other measures:</b> backup failover tested <b>{sm?.failoverTested ? 'Yes' : <span className="txt-off">No</span>}</b> · open critical vulnerabilities <b>{sm?.openCritVulns ?? '–'}</b> · end-of-life devices <b>{num(sm?.eolDevices)}</b> · asset inventory accuracy <b>{pct(sm?.assetAccuracy)}</b> · local IT projects <b>{ds.projects.filter((p) => p.site === site.key).length}</b>
       </div>
+      <Band type="act" note="Recommended actions for this site" />
       <div className="commentary">
         <div className="commentary-head">Recommended actions</div>
         <ol className="keypoints">{(ds.siteActions[site.key] ?? []).map((a) => <li key={a}>{a}</li>)}</ol>
       </div>
-      <SiteComparison onPick={(k) => set({ site: k })} current={site.key} />
     </div>
   );
 }

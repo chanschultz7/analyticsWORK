@@ -53,6 +53,13 @@ with "GitHub Actions" as the source in the repository settings).
 
 ## How it works
 
+- **Page layout** (same as RCM analytics): every analysis page (Service Desk, Clinical Apps,
+  Infrastructure, Major Incidents, Security, Financial, Site tear sheet) reads top to bottom in five
+  numbered bands, always in the same order: **1 Performance** (are we on target?), **2 Trend** (is it
+  getting better or worse?), **3 Where** (which sites, regions and services?), **4 Why** (what drives
+  it?) and **5 Act** (what do we work, and where is the detail?). The Act band shows the next-month
+  actions, open corrective actions or budget decisions for that area.
+
 - **Period** (left pane, and the Executive header): choose the view (Month, Quarter, Year to date,
   Full year, Rolling 12 months), then the **Year**, then the **Month** or **Quarter**. Compare to the
   prior period or the same period last year. Counts and hours add up over the period, rates are

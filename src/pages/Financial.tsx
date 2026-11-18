@@ -7,7 +7,7 @@ import { miOf } from '../periods';
 import { useApp } from '../state';
 import { Chart } from '../ui/Chart';
 import { lineOption, SERIES, stackedOption } from '../ui/charts';
-import { Commentary, KpiStrip, RagCell, SectionHead } from '../ui/common';
+import { Band, Commentary, KpiStrip, RagCell } from '../ui/common';
 import { Grid, gridExport, type Col } from '../ui/Grid';
 import { CanvasHeader } from '../ui/Shell';
 import { Visual } from '../ui/Visual';
@@ -16,7 +16,7 @@ const usd = (v: number | null | undefined) => fmt(v ?? null, 'usd');
 const sum = <T,>(r: T[], f: (x: T) => number) => r.reduce((a, x) => a + f(x), 0);
 
 export function Financial() {
-  const { ds, ctx, period, cmpPeriod, set } = useApp();
+  const { ds, ctx, period, cmpPeriod, set, go } = useApp();
   const ec: Ctx = { ...ctx, sites: [], pri: [], cat: [] };
   const f = finRows(ds, ec);
   const cc = shiftCtx(ec, priorShift(ec.kind));
@@ -105,7 +105,7 @@ export function Financial() {
   return (
     <div className="page">
       <CanvasHeader />
-      <SectionHead title="Cost and budget" note={`${period.label} · mock figures; run budget set per calendar year`} />
+      <Band type="kpi" note={`Are IT costs on budget and unit costs at target? · ${period.label} · mock figures`} />
       <KpiStrip ids={[
         { id: 'it_spend', label: 'Managed IT spend', sub: () => <span className="muted">Budget {usd(budget)} · {fmtDelta(spend - budget, 'usd')}</span> },
         'spend_vs_budget', 'total_it_cost', 'project_spend',
@@ -114,6 +114,11 @@ export function Financial() {
         { id: 'credits', label: 'Service credits applied', sub: () => <span className="muted">{creditRows.length} service levels missed</span> },
         { id: 'downtime_cost', label: 'Est. cost of clinical downtime', sub: () => <span className="muted">{incs.reduce((a, i) => a + i.clinicalDowntimeHrs, 0).toFixed(1)} hrs × {usd(ds.downtimeCostPerHour)}/hr</span> },
       ]} />
+      <Visual title="IT cost summary" subtitle={`${period.label} vs ${cmpPeriod.label}`} table={gridExport(lcols, lg, net)}>
+        <Grid caption="IT cost summary" columns={lcols} rows={lg} total={net} dense />
+      </Visual>
+
+      <Band type="trend" />
       <div className="row cols-7-5">
         <Visual title="Managed IT spend vs budget, monthly" metricId="it_spend" subtitle="Columns: fee components · line: run budget · click a month to set the period"
           table={{ columns: ['Month', 'Fixed fee', 'Devices', 'Overage', 'Total', 'Budget'], rows: months.map((m) => { const x = fin(m.mi); return [m.label, x.feeFixed, x.feeDevices, x.feeOverage, feeOf(x), x.budgetRun]; }) }}>
@@ -128,13 +133,14 @@ export function Financial() {
               series: [{ name: `${period.year} spend`, data: cum.map((c) => c.s), color: SERIES[0] }, { name: 'Budget', data: cum.map((c) => c.b), color: '#4b5361', dashed: true }, { name: `${period.year - 1} spend`, data: cum.map((c) => c.py), color: '#a9b0bb' }] })} />
         </Visual>
       </div>
-      <Visual title="IT cost summary" subtitle={`${period.label} vs ${cmpPeriod.label}`} table={gridExport(lcols, lg, net)}>
-        <Grid caption="IT cost summary" columns={lcols} rows={lg} total={net} dense />
-      </Visual>
 
-      <CostByServiceLine />
+      <Band type="where" note="Where does IT cost go: by site and by service line (allocated by ticket share)" />
+      <div className="row cols-2">
+        <CostBy dim="site" />
+        <CostBy dim="svc" />
+      </div>
 
-      <SectionHead title="Value and cost of service misses" note="Service credits recovered under the contract and the estimated cost of downtime" />
+      <Band type="why" note="What drives cost beyond plan: service credits for missed service levels and the cost of downtime" />
       <div className="row cols-2">
         <Visual title="Service credits by service level" metricId="credits" subtitle={`${period.label} · credit per month missed (A1)`} table={gridExport(crCols, creditRows.map((r) => ({ id: r.label, data: r })))}>
           <Grid caption="Service credits" columns={crCols} rows={creditRows.map((r) => ({ id: r.label, data: r }))} dense defaultSort={{ key: 'credit', dir: 'desc' }} />
@@ -144,7 +150,8 @@ export function Financial() {
         </Visual>
       </div>
 
-      <SectionHead title="Project portfolio budget" note="Budget, spend to date and remaining (life of project)" />
+      <Band type="act" note="Budget decisions to make and project spend to manage" actions={<button type="button" className="btn btn-primary btn-sm" onClick={() => go('projects')}>Projects, actions and decisions ›</button>} />
+      <FinancialDecisions />
       <Visual title="Project budgets" subtitle="Amber when spend runs more than 10 points ahead of completion; red when over budget" table={gridExport(pCols, pg, ptotal)}>
         <Grid caption="Project budgets" columns={pCols} rows={pg} total={ptotal} dense defaultSort={{ key: 'budget', dir: 'desc' }} />
       </Visual>
@@ -160,28 +167,50 @@ export function Financial() {
   );
 }
 
-/** Managed IT spend allocated to service lines by their share of tickets (a simple chargeback view). */
-function CostByServiceLine() {
+/** Managed IT spend allocated by share of tickets, to sites or to service lines (a simple chargeback view). */
+function CostBy({ dim }: { dim: 'site' | 'svc' }) {
   const { ds, ctx, period } = useApp();
   const ec: Ctx = { ...ctx, pri: [], cat: [], svc: [] };
   const spend = sum(finRows(ds, ec), feeOf);
-  const all = sum(ds.tickets.filter((t) => ec.mis.includes(t.mi) && (!ec.sites.length || ec.sites.includes(t.site))), (t) => t.opened);
-  type R = { key: number; name: string; pt: string; tickets: number; share: number; cost: number };
-  const rows: R[] = ds.serviceLines.map((s) => {
-    const n = sum(ds.tickets.filter((t) => t.svc === s.key && ec.mis.includes(t.mi) && (!ec.sites.length || ec.sites.includes(t.site))), (t) => t.opened);
-    return { key: s.key, name: s.name, pt: ds.patientTypes[s.patientType], tickets: n, share: all ? n / all : 0, cost: all ? (spend * n) / all : 0 };
+  const inScope = ds.tickets.filter((t) => ec.mis.includes(t.mi) && (!ec.sites.length || ec.sites.includes(t.site)));
+  const all = sum(inScope, (t) => t.opened);
+  type R = { key: number; name: string; group: string; tickets: number; share: number; cost: number };
+  const members = dim === 'site'
+    ? ds.sites.filter((x) => !ec.sites.length || ec.sites.includes(x.key)).map((x) => ({ key: x.key, name: x.short, group: ds.facilityTypes[x.facilityType] }))
+    : ds.serviceLines.map((x) => ({ key: x.key, name: x.name, group: ds.patientTypes[x.patientType] }));
+  const rows: R[] = members.map((m) => {
+    const n = sum(inScope.filter((t) => (dim === 'site' ? t.site : t.svc) === m.key), (t) => t.opened);
+    return { ...m, tickets: n, share: all ? n / all : 0, cost: all ? (spend * n) / all : 0 };
   });
   const cols: Col<R>[] = [
-    { key: 'name', label: 'Service line', width: 200, value: (r) => r.name },
-    { key: 'pt', label: 'Patient type', align: 'left', value: (r) => r.pt },
+    { key: 'name', label: dim === 'site' ? 'Site' : 'Service line', width: 170, value: (r) => r.name },
+    { key: 'group', label: dim === 'site' ? 'Facility type' : 'Patient type', align: 'left', value: (r) => r.group },
     { key: 'tickets', label: 'Tickets', value: (r) => r.tickets, render: (r) => r.tickets.toLocaleString() },
     { key: 'share', label: 'Share', value: (r) => r.share, render: (r) => pct(r.share, 0) },
     { key: 'cost', label: 'Allocated IT cost', value: (r) => r.cost, render: (r) => usd(r.cost), bar: true },
   ];
   const g = rows.map((r) => ({ id: String(r.key), data: r }));
   return (
-    <Visual title="Managed IT cost by service line" subtitle={`${period.label} · managed services spend allocated by each service line's share of tickets (illustrative chargeback)`} table={gridExport(cols, g)}>
-      <Grid caption="IT cost by service line" columns={cols} rows={g} dense defaultSort={{ key: 'cost', dir: 'desc' }} />
+    <Visual title={`Managed IT cost by ${dim === 'site' ? 'site' : 'service line'}`} subtitle={`${period.label} · managed services spend allocated by share of tickets (illustrative chargeback)`} table={gridExport(cols, g)}>
+      <Grid caption={`IT cost by ${dim}`} columns={cols} rows={g} dense defaultSort={{ key: 'cost', dir: 'desc' }} maxHeight={380} />
     </Visual>
+  );
+}
+
+/** Decisions with a budget impact (MOR slide 13), shown in the Act band. */
+function FinancialDecisions() {
+  const { ds } = useApp();
+  return (
+    <section className="visual">
+      <div className="visual-head"><div className="visual-titles"><h3>Decisions with a budget impact</h3><div className="visual-sub">From the MOR decisions log · recommendation, decision maker and cost of delay</div></div></div>
+      <div className="visual-body">
+        <ol className="decision-list">
+          {ds.decisions.map((d) => (
+            <li key={d.decision}><b>{d.decision}.</b> Options: {d.options}. Convene recommends {d.recommend}.
+              <div className="action-meta">Decision maker: {d.maker} · Needed by {d.by} · Cost of delay: {d.costOfDelay}.</div></li>
+          ))}
+        </ol>
+      </div>
+    </section>
   );
 }

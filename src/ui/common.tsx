@@ -161,3 +161,54 @@ export function SectionHead({ title, note, right }: { title: string; note?: Reac
     </div>
   );
 }
+
+// ---------------------------------------------------------------- bands (standard page layout)
+
+export type BandType = 'kpi' | 'trend' | 'where' | 'why' | 'act';
+
+/**
+ * The standard order of every analysis page, as in RCM analytics: 1 Performance, 2 Trend, 3 Where,
+ * 4 Why, 5 Act. The number is fixed, so "Why" is always 4.
+ */
+export const BANDS: Record<BandType, { n: number; title: string; question: string }> = {
+  kpi: { n: 1, title: 'Performance', question: 'Are we on target?' },
+  trend: { n: 2, title: 'Trend', question: 'Is it getting better or worse?' },
+  where: { n: 3, title: 'Where', question: 'Which sites, regions and services?' },
+  why: { n: 4, title: 'Why', question: 'What drives it?' },
+  act: { n: 5, title: 'Act', question: 'What do we work, and where is the detail?' },
+};
+
+export function Band({ type, note, actions }: { type: BandType; note?: string; actions?: ReactNode }) {
+  const b = BANDS[type];
+  return (
+    <div className={`band band-${type}`}>
+      <span className="band-num" aria-hidden="true">{b.n}</span>
+      <h2>{b.title}</h2>
+      <span className="band-q">{note ?? b.question}</span>
+      {actions && <span className="band-actions">{actions}</span>}
+    </div>
+  );
+}
+
+/** Next-month actions for an area (MOR slide 13), shown in the Act band of its page. */
+export function AreaActions({ areas, match }: { areas: string[]; match?: RegExp }) {
+  const { ds, go } = useApp();
+  const list = ds.nextActions.filter((a) => areas.includes(a.area) && (!match || match.test(`${a.action} ${a.measure}`)));
+  return (
+    <section className="visual">
+      <div className="visual-head"><div className="visual-titles"><h3>Actions for next month</h3><div className="visual-sub">From the MOR action plan · owner, due date and the measure that shows it worked</div></div>
+        <div className="visual-tools"><button type="button" className="link" onClick={() => go('projects')}>All actions and decisions ›</button></div></div>
+      <div className="visual-body">
+        {list.length === 0 ? <div className="muted small">No actions logged for this area this month.</div> : (
+          <ol className="actions">
+            {list.map((a, i) => (
+              <li key={a.action}><span className="action-num">{i + 1}</span>
+                <div><div className="action-title">{a.action}</div><div className="action-meta">Owner: {a.owner} · Due: {a.due} · Measure: {a.measure}</div></div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </section>
+  );
+}

@@ -2,11 +2,11 @@
 // interface health. Enterprise measures: the site filter does not apply.
 
 import { fmt, num, pct } from '../format';
-import { evaluate, priorShift, shiftCtx, systemAvailability, systemRows } from '../metrics';
+import { evaluate, incidentsIn, priorShift, shiftCtx, systemAvailability, systemRows } from '../metrics';
 import { useApp } from '../state';
 import { Chart } from '../ui/Chart';
 import { barOption, SERIES, STATUS_COLOR, stackedOption } from '../ui/charts';
-import { Commentary, KpiStrip, StatusMark } from '../ui/common';
+import { AreaActions, Band, Commentary, KpiStrip, StatusMark } from '../ui/common';
 import { Grid, gridExport, type Col } from '../ui/Grid';
 import { CanvasHeader } from '../ui/Shell';
 import { Visual } from '../ui/Visual';
@@ -15,7 +15,7 @@ import { TrendVisual } from '../ui/widgets';
 interface SysRow { key: number; name: string; tier: string; avail: number | null; target: number; unplanned: number; planned: number; windows: number; tickets: number; issue: string; owner: string; prior: number | null }
 
 export function Clinical() {
-  const { ds, ctx, period, cmpPeriod } = useApp();
+  const { ds, ctx, period, cmpPeriod, go } = useApp();
   const mi = ctx.mi;
   const mis = ctx.mis;
   const pmis = shiftCtx(ctx, priorShift(ctx.kind))?.mis ?? [];
@@ -53,6 +53,7 @@ export function Clinical() {
   return (
     <div className="page">
       <CanvasHeader />
+      <Band type="kpi" note="Were the EHR and clinical systems available? (MOR slide 8)" />
       <KpiStrip ids={[
         { id: 'ehr_avail', label: 'EHR · availability', sub: () => <span className="muted">{num(ehr.unplanned)} min unplanned · {ehr.tickets} tickets</span> },
         { id: 'clin_below', label: 'Clinical systems below target', sub: () => <span className="muted ellipsis">{below.length ? below.map((b) => b.name.replace(' (production)', '')).join(', ') : 'All systems at target'}</span> },
@@ -61,21 +62,22 @@ export function Clinical() {
         { id: 'clin_planned', label: 'Planned downtime', sub: () => <span className="muted">{fmt(planned, 'count', 1)} hrs in {windows} windows · downtime procedures used: {anyDowntimeProc ? 'Yes' : 'No'}</span> },
         { id: 'interface_errors', label: 'Interfaces · errors and delays', sub: () => <span className="muted">{num(errs)} errors · {delays} delays · most: {worstIf?.interfaceErrors ? ds.systems[worstIf.sys].name : '–'}</span> },
       ]} />
+
+      <Band type="trend" />
+      <div className="row cols-2">
+        <TrendVisual id="ehr_avail" title="EHR availability, monthly" height={240} />
+        <Visual title="Unplanned downtime by system, monthly" subtitle="Minutes · stacked by system" table={{ columns: ['Month', ...ds.systems.map((s) => s.name)], rows: months.map((m) => [m.label, ...ds.systems.map((s) => systemRows(ds, m.mi).find((x) => x.sys === s.key)?.unplannedMin ?? 0)]) }}>
+          <Chart height={240} ariaLabel="Unplanned downtime by system"
+            option={stackedOption({ labels: months.map((m) => m.short), fmt: (v) => `${num(v)} min`, series: ds.systems.map((s, i) => ({ name: s.name, color: SERIES[i], data: months.map((m) => systemRows(ds, m.mi).find((x) => x.sys === s.key)?.unplannedMin ?? 0) })) })} />
+        </Visual>
+      </div>
+
+      <Band type="where" note="Which clinical systems missed target, and by how much?" />
       <div className="row cols-5-7">
         <Visual title="Availability by clinical system" subtitle="Unplanned downtime only · colored where below tier target" table={gridExport(cols, g)}>
           <Chart height={280} ariaLabel="Availability by clinical system"
             option={barOption({ labels: rows.map((r) => r.name), horizontal: true, fmt: (v) => pct(v, 2), min: Math.min(0.99, ...rows.map((r) => r.avail ?? 1)) - 0.001, max: 1, target: 0.999,
               series: [{ name: period.short, data: rows.map((r) => r.avail) }], colorBy: (i) => (st(rows[i]) === 'ok' ? SERIES[0] : STATUS_COLOR[st(rows[i])]) })} />
-        </Visual>
-        <TrendVisual id="ehr_avail" title="EHR availability, monthly" height={280} />
-      </div>
-      <Visual title="Clinical systems detail" subtitle={`${period.label} · P1 tier target 99.9%, general 99.5% (Convene default, confirm per contract)`} table={gridExport(cols, g)}>
-        <Grid caption="Clinical systems" columns={cols} rows={g} dense />
-      </Visual>
-      <div className="row cols-2">
-        <Visual title="Unplanned downtime by system, monthly" subtitle="Minutes · stacked by system" table={{ columns: ['Month', ...ds.systems.map((s) => s.name)], rows: months.map((m) => [m.label, ...ds.systems.map((s) => systemRows(ds, m.mi).find((x) => x.sys === s.key)?.unplannedMin ?? 0)]) }}>
-          <Chart height={240} ariaLabel="Unplanned downtime by system"
-            option={stackedOption({ labels: months.map((m) => m.short), fmt: (v) => `${num(v)} min`, series: ds.systems.map((s, i) => ({ name: s.name, color: SERIES[i], data: months.map((m) => systemRows(ds, m.mi).find((x) => x.sys === s.key)?.unplannedMin ?? 0) })) })} />
         </Visual>
         <Visual title="System status for the period" subtitle={`${period.label} · status per A4 rules`}>
           <div className="status-list">
@@ -92,7 +94,40 @@ export function Clinical() {
           <p className="footnote">Critical-systems availability (excluding EHR): {pct(evaluate(ds, 'clin_avail', { ...ctx, sites: [] }).value, 2)}.</p>
         </Visual>
       </div>
-      <Commentary>{ds.commentary.clinical}</Commentary>
+
+      <Band type="why" note="What drove the downtime: top issue, tickets and the major incidents behind it" />
+      <Visual title="Clinical systems detail" subtitle={`${period.label} · P1 tier target 99.9%, general 99.5% (Convene default, confirm per contract)`} table={gridExport(cols, g)}>
+        <Grid caption="Clinical systems" columns={cols} rows={g} dense />
+      </Visual>
+      <ClinicalIncidents />
+
+      <Band type="act" note="Fixes in flight for clinical systems" actions={<button type="button" className="btn btn-primary btn-sm" onClick={() => go('incidents')}>Major incident log ›</button>} />
+      <div className="row cols-2">
+        <Commentary>{ds.commentary.clinical}</Commentary>
+        <AreaActions areas={['Infrastructure', 'Service Desk']} match={/EHR|clinical|interface/i} />
+      </div>
     </div>
+  );
+}
+
+/** Major incidents in the period that hit clinical systems (the "why" behind unplanned downtime). */
+function ClinicalIncidents() {
+  const { ds, ctx, period } = useApp();
+  const clinical = new Set(ds.systems.map((x) => x.name));
+  const rows = incidentsIn(ds, { ...ctx, sites: [] }).filter((i) => clinical.has(i.system));
+  type R = (typeof rows)[number];
+  const cols: Col<R>[] = [
+    { key: 'id', label: 'Incident', value: (r) => r.id },
+    { key: 'sys', label: 'System', align: 'left', value: (r) => r.system },
+    { key: 'sev', label: 'Sev.', align: 'center', value: (r) => r.sev, render: (r) => <span className={`sev sev-${r.sev}`}>{r.sev}</span> },
+    { key: 'dur', label: 'Duration', value: (r) => r.durationHrs, render: (r) => `${r.durationHrs.toFixed(1)} hrs` },
+    { key: 'rc', label: 'Root cause', align: 'left', wrap: true, value: (r) => r.rootCause, render: (r) => <span>{r.rootCause}; <span className={r.rcStatus === 'Confirmed' ? 'txt-ok' : 'txt-watch'}>{r.rcStatus}</span></span> },
+    { key: 'act', label: 'Preventive action', align: 'left', wrap: true, value: (r) => r.action, render: (r) => <span>{r.action} <span className="muted">· {r.owner}, {r.due}</span></span> },
+  ];
+  const g = rows.map((r) => ({ id: r.id, data: r }));
+  return (
+    <Visual title="Major incidents on clinical systems" subtitle={`${period.label} · P1 and P2 incidents with root cause and preventive action`} table={gridExport(cols, g)}>
+      <Grid caption="Clinical incidents" columns={cols} rows={g} dense defaultSort={{ key: 'dur', dir: 'desc' }} />
+    </Visual>
   );
 }
